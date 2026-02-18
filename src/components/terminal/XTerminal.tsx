@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { type IMarker, Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "../../context/ThemeContext";
 import type { FuzzyResult } from "../../types";
 import CommandSuggestions from "./CommandSuggestions";
@@ -39,6 +40,7 @@ export default function XTerminal({ sessionId, active }: XTerminalProps) {
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const { theme } = useTheme();
+  const { t } = useTranslation();
 
   // Fuzzy search: refs for the onData callback, state for rendering
   const currentLineRef = useRef("");
@@ -395,7 +397,7 @@ export default function XTerminal({ sessionId, active }: XTerminalProps) {
       });
 
       closedUnlisten = await listen<void>(`session-closed-${sessionId}`, () => {
-        terminal.write("\r\n\x1b[31m[Session disconnected]\x1b[0m\r\n");
+        terminal.write(`\r\n\x1b[31m[${t("terminal.sessionDisconnected")}]\x1b[0m\r\n`);
       });
 
       // Listener is ready — tell the backend to flush buffered output

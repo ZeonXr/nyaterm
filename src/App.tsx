@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import AboutDialog from "./components/dialog/AboutDialog";
 import NewSessionDialog from "./components/dialog/NewSessionDialog";
 import Header from "./components/layout/Header";
@@ -26,13 +27,19 @@ function App() {
     closeTab,
     uiConfig,
     updateUiConfig,
-    // savedConnections, // consumed by ActiveSessions/SavedConnections if refactored
     showNewSession,
     setShowNewSession,
     editingConnection,
     setEditingConnection,
     refreshConnections,
   } = useApp();
+  const { t, i18n } = useTranslation();
+
+  useEffect(() => {
+    if (uiConfig.language && uiConfig.language !== i18n.language) {
+      i18n.changeLanguage(uiConfig.language);
+    }
+  }, [uiConfig.language, i18n]);
 
   // Mobile state
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false);
@@ -206,12 +213,12 @@ function App() {
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <div className="text-center space-y-3">
                     <span className="material-icons text-4xl">terminal</span>
-                    <p className="text-sm">No active sessions</p>
+                    <p className="text-sm">{t("app.noActiveSessions")}</p>
                     <button
                       className="px-4 py-2 text-xs bg-primary hover:bg-primary/80 text-white rounded transition-colors"
                       onClick={handleNewSession}
                     >
-                      New Connection
+                      {t("app.newConnection")}
                     </button>
                   </div>
                 </div>

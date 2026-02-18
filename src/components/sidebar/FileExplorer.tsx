@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface FileEntry {
   name: string;
@@ -48,6 +49,7 @@ function formatSize(bytes: number): string {
 
 /** Remote file browser for active SSH session. Lists dirs/files, supports navigation. */
 export default function FileExplorer({ activeSessionId }: FileExplorerProps) {
+  const { t } = useTranslation();
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [currentPath, setCurrentPath] = useState("");
   const [homeDir, setHomeDir] = useState("");
@@ -137,7 +139,7 @@ export default function FileExplorer({ activeSessionId }: FileExplorerProps) {
         className="p-2 text-[10px] uppercase tracking-wider font-bold border-b flex justify-between items-center"
         style={{ color: "var(--df-text-muted)", borderColor: "var(--df-border)" }}
       >
-        <span>File Explorer</span>
+        <span>{t("panel.fileExplorer")}</span>
         <div className="flex gap-1">
           {activeSessionId && (
             <>
@@ -145,7 +147,7 @@ export default function FileExplorer({ activeSessionId }: FileExplorerProps) {
                 className="material-icons text-xs cursor-pointer hover:opacity-80 transition-opacity"
                 style={{ color: "var(--df-text-muted)" }}
                 onClick={handleGoUp}
-                title="Go Up"
+                title={t("fileExplorer.goUp")}
               >
                 arrow_upward
               </span>
@@ -153,7 +155,7 @@ export default function FileExplorer({ activeSessionId }: FileExplorerProps) {
                 className="material-icons text-xs cursor-pointer hover:opacity-80 transition-opacity"
                 style={{ color: "var(--df-text-muted)" }}
                 onClick={() => loadDirectory(currentPath)}
-                title="Refresh"
+                title={t("fileExplorer.refresh")}
               >
                 refresh
               </span>
@@ -175,17 +177,17 @@ export default function FileExplorer({ activeSessionId }: FileExplorerProps) {
         {!activeSessionId ? (
           <div className="text-center py-8 text-xs" style={{ color: "var(--df-text-dimmed)" }}>
             <div className="material-icons text-xl block mb-2">folder_off</div>
-            <div className="text-sm block mb-2">Connect to a session to browse files</div>
+            <div className="text-sm block mb-2">{t("fileExplorer.connectToSession")}</div>
           </div>
         ) : loading ? (
           <div className="text-center py-4 text-xs" style={{ color: "var(--df-text-dimmed)" }}>
-            Loading...
+            {t("fileExplorer.loading")}
           </div>
         ) : error ? (
           <div className="text-center text-red-400 py-4 text-xs">{error}</div>
         ) : files.length === 0 ? (
           <div className="text-center py-4 text-xs" style={{ color: "var(--df-text-dimmed)" }}>
-            Empty directory
+            {t("fileExplorer.emptyDirectory")}
           </div>
         ) : (
           <ul className="space-y-0.5">

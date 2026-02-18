@@ -54,6 +54,7 @@ const DEFAULT_UI_CONFIG: UiConfig = {
   show_quick_commands: true,
   zoom_level: 1.0,
   theme: "github-dark",
+  language: "en",
 };
 
 /** Provides tabs, uiConfig, savedConnections, and dialog state to the app. */

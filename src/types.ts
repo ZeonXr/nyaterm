@@ -70,6 +70,7 @@ export interface UiConfig {
   show_quick_commands: boolean;
   zoom_level: number;
   theme?: string;
+  language?: string;
 }
 
 /** Labeled command shortcut for quick execution. */

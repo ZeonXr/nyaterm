@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /** Footer bar showing current time. */
 export default function StatusBar() {
+  const { i18n } = useTranslation();
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -9,10 +11,11 @@ export default function StatusBar() {
     return () => clearInterval(timer);
   }, []);
 
-  const formattedTime = time.toLocaleTimeString("en-US", {
+  const locale = i18n.language === "zh-CN" ? "zh-CN" : "en-US";
+  const formattedTime = time.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
-    hour12: true,
+    hour12: i18n.language !== "zh-CN",
   });
 
   return (

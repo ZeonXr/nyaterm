@@ -1,0 +1,118 @@
+{
+  "menu": {
+    "file": "File",
+    "edit": "Edit",
+    "view": "View",
+    "terminal": "Terminal",
+    "help": "Help",
+    "newSshConnection": "New SSH Connection",
+    "exit": "Exit",
+    "copy": "Copy",
+    "paste": "Paste",
+    "selectAll": "Select All",
+    "layout": "Layout",
+    "theme": "Theme",
+    "language": "Language",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "resetZoom": "Reset Zoom",
+    "fullscreen": "Fullscreen",
+    "newLocalTerminal": "New Local Terminal",
+    "documentation": "Documentation",
+    "checkForUpdates": "Check for Updates",
+    "viewLogs": "View Logs",
+    "about": "About"
+  },
+  "panel": {
+    "fileExplorer": "File Explorer",
+    "savedConnections": "Saved Connections",
+    "activeSessions": "Active Sessions",
+    "commandHistory": "Command History",
+    "quickCommands": "Quick Commands",
+    "noSavedConnections": "No saved connections",
+    "noActiveSessions": "No active sessions",
+    "noCommandsYet": "No commands yet"
+  },
+  "dialog": {
+    "editConnection": "Edit Connection",
+    "newConnection": "New Connection",
+    "localTerminal": "Local Terminal",
+    "openLocalShell": "Open a local shell session",
+    "sshConnection": "SSH Connection",
+    "connectionName": "Connection Name",
+    "group": "Group",
+    "host": "Host",
+    "port": "Port",
+    "username": "Username",
+    "authentication": "Authentication",
+    "password": "Password",
+    "privateKey": "Private Key",
+    "keyFileLoaded": "Key file loaded",
+    "selectKeyFile": "Select private key file...",
+    "selectKeyFileTitle": "Select Private Key File",
+    "passphrase": "Passphrase (optional)",
+    "description": "Description",
+    "descriptionPlaceholder": "e.g. Web server for project X",
+    "serverPlaceholder": "My Server",
+    "newGroupPlaceholder": "New group...",
+    "none": "None",
+    "hostRequired": "Host is required",
+    "connectionSaved": "Connection saved successfully!",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving..."
+  },
+  "about": {
+    "description": "A modern, high-performance SSH client built with Tauri and React.",
+    "website": "Website",
+    "issues": "Issues",
+    "close": "Close"
+  },
+  "terminal": {
+    "newConnection": "New Connection",
+    "sessionDisconnected": "Session disconnected"
+  },
+  "fileExplorer": {
+    "goUp": "Go Up",
+    "refresh": "Refresh",
+    "connectToSession": "Connect to a session to browse files",
+    "loading": "Loading...",
+    "emptyDirectory": "Empty directory"
+  },
+  "quickCommands": {
+    "label": "Label",
+    "command": "Command",
+    "add": "Add",
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "suggestions": {
+    "history": "History",
+    "match": "match",
+    "matches": "matches",
+    "select": "select",
+    "execute": "execute",
+    "fill": "fill",
+    "dismiss": "dismiss"
+  },
+  "savedConnections": {
+    "connect": "Connect",
+    "edit": "Edit",
+    "delete": "Delete",
+    "host": "Host",
+    "port": "Port",
+    "user": "User",
+    "auth": "Auth",
+    "group": "Group",
+    "connectionFailed": "Connection failed: {{error}}",
+    "deleteFailed": "Failed to delete connection: {{error}}"
+  },
+  "app": {
+    "noActiveSessions": "No active sessions",
+    "newConnection": "New Connection"
+  },
+  "error": {
+    "somethingWentWrong": "Something went wrong",
+    "reloadApplication": "Reload Application"
+  }
+}

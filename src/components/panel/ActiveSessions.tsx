@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { memo, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { SessionInfo } from "../../types";
 
 interface ActiveSessionsProps {
@@ -8,6 +9,7 @@ interface ActiveSessionsProps {
 
 /** List of active sessions (polled). Click switches to that session's tab. */
 function ActiveSessions({ onSessionClick }: ActiveSessionsProps) {
+  const { t } = useTranslation();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
 
   useEffect(() => {
@@ -35,7 +37,7 @@ function ActiveSessions({ onSessionClick }: ActiveSessionsProps) {
           backgroundColor: "var(--df-bg-section-header)",
         }}
       >
-        <span>Active Sessions</span>
+        <span>{t("panel.activeSessions")}</span>
         <span className="text-[10px] font-normal" style={{ color: "var(--df-text-dimmed)" }}>
           {sessions.length}
         </span>
@@ -43,7 +45,7 @@ function ActiveSessions({ onSessionClick }: ActiveSessionsProps) {
       <div className="flex-1 overflow-y-auto p-2 text-xs space-y-0.5 terminal-scroll">
         {sessions.length === 0 ? (
           <div className="text-center py-4 text-[11px]" style={{ color: "var(--df-text-dimmed)" }}>
-            No active sessions
+            {t("panel.noActiveSessions")}
           </div>
         ) : (
           sessions.map((session) => (

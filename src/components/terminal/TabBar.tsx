@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import type { Tab } from "../../types";
 
 interface TabBarProps {
@@ -18,6 +19,8 @@ function TabBar({
   onTabClose,
   onAddTab,
 }: TabBarProps) {
+  const { t } = useTranslation();
+
   const handleClose = (e: React.MouseEvent, tab: Tab) => {
     e.stopPropagation();
     // Close the backend session
@@ -57,7 +60,7 @@ function TabBar({
         className="px-3 transition-colors df-hover"
         style={{ color: "var(--df-text-muted)" }}
         onClick={onAddTab}
-        title="New Connection"
+        title={t("terminal.newConnection")}
       >
         <span className="material-icons text-base">add</span>
       </button>

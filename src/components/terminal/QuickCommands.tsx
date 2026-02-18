@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { QuickCommand } from "../../types";
 
 interface QuickCommandsProps {
@@ -8,6 +9,7 @@ interface QuickCommandsProps {
 
 /** Editable quick-command buttons. Loads/saves from backend; onSend runs command in active tab. */
 function QuickCommands({ onSend }: QuickCommandsProps) {
+  const { t } = useTranslation();
   const [commands, setCommands] = useState<QuickCommand[]>([]);
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -107,7 +109,7 @@ function QuickCommands({ onSend }: QuickCommandsProps) {
                 className="bg-transparent text-[11px] outline-none w-14"
                 style={{ color: "var(--df-text)" }}
                 value={editLabel}
-                placeholder="Label"
+                placeholder={t("quickCommands.label")}
                 onChange={(e) => setEditLabel(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleEditSave();
@@ -121,7 +123,7 @@ function QuickCommands({ onSend }: QuickCommandsProps) {
                 className="bg-transparent text-[11px] font-mono outline-none w-24"
                 style={{ color: "var(--df-text-muted)" }}
                 value={editCommand}
-                placeholder="Command"
+                placeholder={t("quickCommands.command")}
                 onChange={(e) => setEditCommand(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleEditSave();
@@ -157,7 +159,7 @@ function QuickCommands({ onSend }: QuickCommandsProps) {
                 <button
                   className="material-icons text-xs transition-colors"
                   style={{ color: "var(--df-text-dimmed)" }}
-                  title="Edit"
+                  title={t("quickCommands.edit")}
                   onClick={(e) => {
                     e.stopPropagation();
                     startEdit(cmd);
@@ -168,7 +170,7 @@ function QuickCommands({ onSend }: QuickCommandsProps) {
                 <button
                   className="material-icons text-xs hover:text-red-400 transition-colors"
                   style={{ color: "var(--df-text-dimmed)" }}
-                  title="Delete"
+                  title={t("quickCommands.delete")}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDelete(cmd.id);
@@ -191,7 +193,7 @@ function QuickCommands({ onSend }: QuickCommandsProps) {
               className="bg-transparent text-[11px] outline-none w-14"
               style={{ color: "var(--df-text)" }}
               value={newLabel}
-              placeholder="Label"
+              placeholder={t("quickCommands.label")}
               onChange={(e) => setNewLabel(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleAdd();
@@ -205,7 +207,7 @@ function QuickCommands({ onSend }: QuickCommandsProps) {
               className="bg-transparent text-[11px] font-mono outline-none w-24"
               style={{ color: "var(--df-text-muted)" }}
               value={newCommand}
-              placeholder="Command"
+              placeholder={t("quickCommands.command")}
               onChange={(e) => setNewCommand(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleAdd();
@@ -233,7 +235,7 @@ function QuickCommands({ onSend }: QuickCommandsProps) {
             onClick={() => setAdding(true)}
           >
             <span className="material-icons text-sm">add</span>
-            <span>Add</span>
+            <span>{t("quickCommands.add")}</span>
           </button>
         )}
       </div>

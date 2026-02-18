@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Group, SavedConnection } from "../../types";
 
 interface NewSessionDialogProps {
@@ -26,6 +27,7 @@ export default function NewSessionDialog({
   onSaved,
   initialData,
 }: NewSessionDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [group, setGroup] = useState("");
   const [description, setDescription] = useState("");
@@ -113,7 +115,7 @@ export default function NewSessionDialog({
 
   const handleSave = async () => {
     if (!host) {
-      setError("Host is required");
+      setError(t("dialog.hostRequired"));
       return;
     }
 
@@ -159,7 +161,7 @@ export default function NewSessionDialog({
     try {
       const sessionId = await invoke<string>("create_local_session");
       resetForm();
-      onConnect(sessionId, "Local Terminal", "Local");
+      onConnect(sessionId, t("dialog.localTerminal"), "Local");
     } catch (e) {
       setError(String(e));
     } finally {
@@ -183,7 +185,7 @@ export default function NewSessionDialog({
           style={{ borderColor: "var(--df-border)" }}
         >
           <h2 className="text-sm font-semibold" style={{ color: "var(--df-text)" }}>
-            {initialData ? "Edit Connection" : "New Connection"}
+            {initialData ? t("dialog.editConnection") : t("dialog.newConnection")}
           </h2>
           <span
             className="material-icons text-base cursor-pointer transition-opacity hover:opacity-70"
@@ -206,10 +208,10 @@ export default function NewSessionDialog({
               <span className="material-icons text-xl text-cyan-400">terminal</span>
               <div>
                 <div className="text-xs font-medium" style={{ color: "var(--df-text)" }}>
-                  Local Terminal
+                  {t("dialog.localTerminal")}
                 </div>
                 <div className="text-[10px]" style={{ color: "var(--df-text-dimmed)" }}>
-                  Open a local shell session
+                  {t("dialog.openLocalShell")}
                 </div>
               </div>
             </button>
@@ -221,7 +223,7 @@ export default function NewSessionDialog({
               style={{ color: "var(--df-text-dimmed)" }}
             >
               <div className="flex-1 border-t" style={{ borderColor: "var(--df-border)" }}></div>
-              <span>SSH Connection</span>
+              <span>{t("dialog.sshConnection")}</span>
               <div className="flex-1 border-t" style={{ borderColor: "var(--df-border)" }}></div>
             </div>
           )}
@@ -230,11 +232,11 @@ export default function NewSessionDialog({
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="block text-[11px] mb-1" style={{ color: "var(--df-text-muted)" }}>
-                Connection Name
+                {t("dialog.connectionName")}
               </label>
               <input
                 type="text"
-                placeholder="My Server"
+                placeholder={t("dialog.serverPlaceholder")}
                 className={inputClass}
                 style={inputStyle}
                 value={name}
@@ -243,7 +245,7 @@ export default function NewSessionDialog({
             </div>
             <div className="w-52 relative" ref={groupRef}>
               <label className="block text-[11px] mb-1" style={{ color: "var(--df-text-muted)" }}>
-                Group
+                {t("dialog.group")}
               </label>
               <button
                 type="button"
@@ -252,7 +254,7 @@ export default function NewSessionDialog({
                 onClick={() => setShowGroupDropdown(!showGroupDropdown)}
               >
                 <span style={{ color: group ? "var(--df-text)" : "var(--df-text-dimmed)" }}>
-                  {group || "None"}
+                  {group || t("dialog.none")}
                 </span>
                 <span className="material-icons text-xs" style={{ color: "var(--df-text-dimmed)" }}>
                   expand_more
@@ -282,7 +284,7 @@ export default function NewSessionDialog({
                       setShowGroupDropdown(false);
                     }}
                   >
-                    None
+                    {t("dialog.none")}
                   </div>
                   {groups.map((g) => (
                     <div
@@ -317,7 +319,7 @@ export default function NewSessionDialog({
                     <div className="flex items-center gap-1.5">
                       <input
                         type="text"
-                        placeholder="New group..."
+                        placeholder={t("dialog.newGroupPlaceholder")}
                         className="flex-1 min-w-0 rounded px-2 py-1 text-xs border focus:outline-none"
                         style={inputStyle}
                         value={newGroupName}
@@ -355,7 +357,7 @@ export default function NewSessionDialog({
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="block text-[11px] mb-1" style={{ color: "var(--df-text-muted)" }}>
-                Host
+                {t("dialog.host")}
               </label>
               <input
                 type="text"
@@ -368,7 +370,7 @@ export default function NewSessionDialog({
             </div>
             <div className="w-20">
               <label className="block text-[11px] mb-1" style={{ color: "var(--df-text-muted)" }}>
-                Port
+                {t("dialog.port")}
               </label>
               <input
                 type="number"
@@ -383,7 +385,7 @@ export default function NewSessionDialog({
           {/* Username */}
           <div>
             <label className="block text-[11px] mb-1" style={{ color: "var(--df-text-muted)" }}>
-              Username
+              {t("dialog.username")}
             </label>
             <input
               type="text"
@@ -397,7 +399,7 @@ export default function NewSessionDialog({
           {/* Auth Type */}
           <div>
             <label className="block text-[11px] mb-1" style={{ color: "var(--df-text-muted)" }}>
-              Authentication
+              {t("dialog.authentication")}
             </label>
             <div className="flex gap-2">
               <button
@@ -412,7 +414,7 @@ export default function NewSessionDialog({
                 }}
                 onClick={() => setAuthType("password")}
               >
-                Password
+                {t("dialog.password")}
               </button>
               <button
                 className="flex-1 py-1.5 text-xs rounded border transition-colors"
@@ -426,7 +428,7 @@ export default function NewSessionDialog({
                 }}
                 onClick={() => setAuthType("key")}
               >
-                Private Key
+                {t("dialog.privateKey")}
               </button>
             </div>
           </div>
@@ -435,7 +437,7 @@ export default function NewSessionDialog({
           {authType === "password" ? (
             <div>
               <label className="block text-[11px] mb-1" style={{ color: "var(--df-text-muted)" }}>
-                Password
+                {t("dialog.password")}
               </label>
               <input
                 type="password"
@@ -449,7 +451,7 @@ export default function NewSessionDialog({
             <>
               <div>
                 <label className="block text-[11px] mb-1" style={{ color: "var(--df-text-muted)" }}>
-                  Private Key
+                  {t("dialog.privateKey")}
                 </label>
                 <div
                   className="flex items-center w-full rounded border overflow-hidden transition-colors"
@@ -465,7 +467,7 @@ export default function NewSessionDialog({
                       opacity: keyFileName || hasKeyData ? 1 : 0.5,
                     }}
                   >
-                    {keyFileName || (hasKeyData ? "Key file loaded" : "Select private key file...")}
+                    {keyFileName || (hasKeyData ? t("dialog.keyFileLoaded") : t("dialog.selectKeyFile"))}
                   </div>
                   <button
                     type="button"
@@ -477,7 +479,7 @@ export default function NewSessionDialog({
                     onClick={async () => {
                       const selected = await openFileDialog({
                         multiple: false,
-                        title: "Select Private Key File",
+                        title: t("dialog.selectKeyFileTitle"),
                       });
                       if (selected) {
                         setKeyFilePath(selected);
@@ -493,7 +495,7 @@ export default function NewSessionDialog({
               </div>
               <div>
                 <label className="block text-[11px] mb-1" style={{ color: "var(--df-text-muted)" }}>
-                  Passphrase (optional)
+                  {t("dialog.passphrase")}
                 </label>
                 <input
                   type="password"
@@ -509,11 +511,11 @@ export default function NewSessionDialog({
           {/* Description */}
           <div>
             <label className="block text-[11px] mb-1" style={{ color: "var(--df-text-muted)" }}>
-              Description
+              {t("dialog.description")}
             </label>
             <textarea
               rows={2}
-              placeholder="e.g. Web server for project X"
+              placeholder={t("dialog.descriptionPlaceholder")}
               className="w-full rounded px-3 py-2 text-xs border focus:outline-none resize-none transition-colors"
               style={inputStyle}
               value={description}
@@ -529,7 +531,7 @@ export default function NewSessionDialog({
           )}
           {saveSuccess && (
             <div className="p-2 bg-green-500/10 border border-green-500/30 rounded text-xs text-green-400">
-              Connection saved successfully!
+              {t("dialog.connectionSaved")}
             </div>
           )}
         </div>
@@ -544,7 +546,7 @@ export default function NewSessionDialog({
             style={{ color: "var(--df-text-muted)" }}
             onClick={handleClose}
           >
-            Cancel
+            {t("dialog.cancel")}
           </button>
           <button
             className="px-4 py-1.5 text-xs text-white rounded transition-colors disabled:opacity-50"
@@ -552,7 +554,7 @@ export default function NewSessionDialog({
             onClick={handleSave}
             disabled={connecting || !host}
           >
-            {connecting ? "Saving..." : "Save"}
+            {connecting ? t("dialog.saving") : t("dialog.save")}
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { memo, useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface CommandHistoryProps {
   onCommandSend: (command: string) => void;
@@ -7,6 +8,7 @@ interface CommandHistoryProps {
 
 /** Command history list (polled). Double-click sends command to active tab. */
 function CommandHistory({ onCommandSend }: CommandHistoryProps) {
+  const { t } = useTranslation();
   const [history, setHistory] = useState<string[]>([]);
 
   useEffect(() => {
@@ -41,7 +43,7 @@ function CommandHistory({ onCommandSend }: CommandHistoryProps) {
           backgroundColor: "var(--df-bg-section-header)",
         }}
       >
-        <span>Command History</span>
+        <span>{t("panel.commandHistory")}</span>
         <span
           className="material-icons text-sm cursor-pointer hover:opacity-80 transition-opacity"
           style={{ color: "var(--df-text-muted)" }}
@@ -55,7 +57,7 @@ function CommandHistory({ onCommandSend }: CommandHistoryProps) {
             className="text-center py-4 font-display text-[11px]"
             style={{ color: "var(--df-text-dimmed)" }}
           >
-            No commands yet
+            {t("panel.noCommandsYet")}
           </div>
         ) : (
           history.map((cmd, index) => (

@@ -1,0 +1,118 @@
+{
+  "menu": {
+    "file": "文件",
+    "edit": "编辑",
+    "view": "视图",
+    "terminal": "终端",
+    "help": "帮助",
+    "newSshConnection": "新建 SSH 连接",
+    "exit": "退出",
+    "copy": "复制",
+    "paste": "粘贴",
+    "selectAll": "全选",
+    "layout": "布局",
+    "theme": "主题",
+    "language": "语言",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "resetZoom": "重置缩放",
+    "fullscreen": "全屏",
+    "newLocalTerminal": "新建本地终端",
+    "documentation": "文档",
+    "checkForUpdates": "检查更新",
+    "viewLogs": "查看日志",
+    "about": "关于"
+  },
+  "panel": {
+    "fileExplorer": "文件浏览器",
+    "savedConnections": "已保存的连接",
+    "activeSessions": "活动会话",
+    "commandHistory": "命令历史",
+    "quickCommands": "快捷命令",
+    "noSavedConnections": "暂无已保存的连接",
+    "noActiveSessions": "暂无活动会话",
+    "noCommandsYet": "暂无命令记录"
+  },
+  "dialog": {
+    "editConnection": "编辑连接",
+    "newConnection": "新建连接",
+    "localTerminal": "本地终端",
+    "openLocalShell": "打开本地 Shell 会话",
+    "sshConnection": "SSH 连接",
+    "connectionName": "连接名称",
+    "group": "分组",
+    "host": "主机",
+    "port": "端口",
+    "username": "用户名",
+    "authentication": "认证方式",
+    "password": "密码",
+    "privateKey": "私钥",
+    "keyFileLoaded": "密钥文件已加载",
+    "selectKeyFile": "选择私钥文件...",
+    "selectKeyFileTitle": "选择私钥文件",
+    "passphrase": "密码短语（可选）",
+    "description": "描述",
+    "descriptionPlaceholder": "例如：项目 X 的 Web 服务器",
+    "serverPlaceholder": "我的服务器",
+    "newGroupPlaceholder": "新建分组...",
+    "none": "无",
+    "hostRequired": "主机地址不能为空",
+    "connectionSaved": "连接保存成功！",
+    "cancel": "取消",
+    "save": "保存",
+    "saving": "保存中..."
+  },
+  "about": {
+    "description": "基于 Tauri 和 React 构建的现代高性能 SSH 客户端。",
+    "website": "官网",
+    "issues": "问题反馈",
+    "close": "关闭"
+  },
+  "terminal": {
+    "newConnection": "新建连接",
+    "sessionDisconnected": "会话已断开"
+  },
+  "fileExplorer": {
+    "goUp": "返回上级",
+    "refresh": "刷新",
+    "connectToSession": "连接会话以浏览文件",
+    "loading": "加载中...",
+    "emptyDirectory": "空目录"
+  },
+  "quickCommands": {
+    "label": "标签",
+    "command": "命令",
+    "add": "添加",
+    "edit": "编辑",
+    "delete": "删除"
+  },
+  "suggestions": {
+    "history": "历史记录",
+    "match": "条匹配",
+    "matches": "条匹配",
+    "select": "选择",
+    "execute": "执行",
+    "fill": "填充",
+    "dismiss": "关闭"
+  },
+  "savedConnections": {
+    "connect": "连接",
+    "edit": "编辑",
+    "delete": "删除",
+    "host": "主机",
+    "port": "端口",
+    "user": "用户",
+    "auth": "认证",
+    "group": "分组",
+    "connectionFailed": "连接失败：{{error}}",
+    "deleteFailed": "删除连接失败：{{error}}"
+  },
+  "app": {
+    "noActiveSessions": "暂无活动会话",
+    "newConnection": "新建连接"
+  },
+  "error": {
+    "somethingWentWrong": "出现错误",
+    "reloadApplication": "重新加载应用"
+  }
+}

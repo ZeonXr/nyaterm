@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { openUrl, openPath } from "@tauri-apps/plugin-opener";
 import { appLogDir } from "@tauri-apps/api/path";
 import packageJson from "../../../package.json";
@@ -29,6 +30,12 @@ export default function Header({
   const menuRef = useRef<HTMLDivElement>(null);
   const { themeName, setTheme, themeNames } = useTheme();
   const { uiConfig, updateUiConfig } = useApp();
+  const { t, i18n } = useTranslation();
+
+  const changeLanguage = (lng: string) => {
+    i18n.changeLanguage(lng);
+    updateUiConfig({ language: lng });
+  };
 
   const handleZoom = (delta: number) => {
     const newZoom = Math.max(0.5, Math.min(2.0, uiConfig.zoom_level + delta));
@@ -47,84 +54,98 @@ export default function Header({
     }
   };
 
+  const menuKeys = [
+    { key: "file", label: t("menu.file") },
+    { key: "edit", label: t("menu.edit") },
+    { key: "view", label: t("menu.view") },
+    { key: "terminal", label: t("menu.terminal") },
+    { key: "help", label: t("menu.help") },
+  ];
+
   const menus: Record<string, MenuItem[]> = {
-    File: [
-      { label: "New SSH Connection", action: onNewSession, icon: "add" },
+    file: [
+      { label: t("menu.newSshConnection"), action: onNewSession, icon: "add" },
       { label: "separator", separator: true },
-      { label: "Exit", action: () => window.close(), icon: "exit_to_app" }, // Assuming window.close() works or using tauri/api
+      { label: t("menu.exit"), action: () => window.close(), icon: "exit_to_app" },
     ],
-    Edit: [
-      { label: "Copy", icon: "content_copy" },
-      { label: "Paste", icon: "content_paste" },
-      { label: "Select All", icon: "select_all" },
+    edit: [
+      { label: t("menu.copy"), icon: "content_copy" },
+      { label: t("menu.paste"), icon: "content_paste" },
+      { label: t("menu.selectAll"), icon: "select_all" },
     ],
-    View: [
-      // Layout Submenu
+    view: [
       {
-        label: "Layout",
+        label: t("menu.layout"),
         icon: "dashboard",
         submenu: [
           {
-            label: "File Explorer",
+            label: t("panel.fileExplorer"),
             checked: uiConfig.show_file_explorer,
             action: () => updateUiConfig({ show_file_explorer: !uiConfig.show_file_explorer }),
           },
           {
-            label: "Saved Connections",
+            label: t("panel.savedConnections"),
             checked: uiConfig.show_saved_connections,
             action: () => updateUiConfig({ show_saved_connections: !uiConfig.show_saved_connections }),
           },
           {
-            label: "Active Sessions",
+            label: t("panel.activeSessions"),
             checked: uiConfig.show_active_sessions,
             action: () => updateUiConfig({ show_active_sessions: !uiConfig.show_active_sessions }),
           },
           {
-            label: "Command History",
+            label: t("panel.commandHistory"),
             checked: uiConfig.show_command_history,
             action: () => updateUiConfig({ show_command_history: !uiConfig.show_command_history }),
           },
           {
-            label: "Quick Commands",
+            label: t("panel.quickCommands"),
             checked: uiConfig.show_quick_commands,
             action: () => updateUiConfig({ show_quick_commands: !uiConfig.show_quick_commands }),
           },
         ],
       },
-      // Theme Submenu
       {
-        label: "Theme",
+        label: t("menu.theme"),
         icon: "palette",
-        submenu: themeNames.map((t) => ({
-          label: t.name,
-          checked: themeName === t.id,
-          action: () => setTheme(t.id),
+        submenu: themeNames.map((th) => ({
+          label: th.name,
+          checked: themeName === th.id,
+          action: () => setTheme(th.id),
         })),
       },
-      { label: "separator", separator: true },
-      { label: "Zoom In", action: () => handleZoom(0.1), icon: "zoom_in" },
-      { label: "Zoom Out", action: () => handleZoom(-0.1), icon: "zoom_out" },
-      { label: "Reset Zoom", action: handleResetZoom, icon: "restart_alt" },
-      { label: "separator", separator: true },
-      { label: "Fullscreen", action: toggleFullscreen, icon: "fullscreen" },
-    ],
-    Terminal: [
-      { label: "New SSH Connection", action: onNewSession, icon: "add" },
-      { label: "New Local Terminal", action: onNewSession, icon: "computer" },
-    ],
-    Help: [
       {
-        label: "Documentation",
+        label: t("menu.language"),
+        icon: "translate",
+        submenu: [
+          { label: "English", checked: i18n.language === "en", action: () => changeLanguage("en") },
+          { label: "中文", checked: i18n.language === "zh-CN", action: () => changeLanguage("zh-CN") },
+        ],
+      },
+      { label: "separator", separator: true },
+      { label: t("menu.zoomIn"), action: () => handleZoom(0.1), icon: "zoom_in" },
+      { label: t("menu.zoomOut"), action: () => handleZoom(-0.1), icon: "zoom_out" },
+      { label: t("menu.resetZoom"), action: handleResetZoom, icon: "restart_alt" },
+      { label: "separator", separator: true },
+      { label: t("menu.fullscreen"), action: toggleFullscreen, icon: "fullscreen" },
+    ],
+    terminal: [
+      { label: t("menu.newSshConnection"), action: onNewSession, icon: "add" },
+      { label: t("menu.newLocalTerminal"), action: onNewSession, icon: "computer" },
+    ],
+    help: [
+      {
+        label: t("menu.documentation"),
         icon: "menu_book",
         action: () => openUrl(packageJson.homepage + "/docs"),
       },
       {
-        label: "Check for Updates",
+        label: t("menu.checkForUpdates"),
         icon: "update",
         action: () => openUrl(packageJson.homepage + "/releases"),
       },
       {
-        label: "View Logs",
+        label: t("menu.viewLogs"),
         icon: "article",
         action: async () => {
           try {
@@ -136,7 +157,7 @@ export default function Header({
         },
       },
       { label: "separator", separator: true },
-      { label: "About", action: onAbout, icon: "info" },
+      { label: t("menu.about"), action: onAbout, icon: "info" },
     ],
   };
 
@@ -169,27 +190,27 @@ export default function Header({
         </button>
 
         <nav className="flex items-center gap-0 text-xs font-medium relative">
-          {Object.keys(menus).map((item) => (
-            <div key={item} className="relative">
+          {menuKeys.map(({ key, label }) => (
+            <div key={key} className="relative">
               <span
                 className="cursor-pointer px-2 py-1 rounded transition-colors"
                 style={{
-                  color: activeMenu === item ? "var(--df-primary)" : "var(--df-text-muted)",
+                  color: activeMenu === key ? "var(--df-primary)" : "var(--df-text-muted)",
                   backgroundColor:
-                    activeMenu === item
+                    activeMenu === key
                       ? "color-mix(in srgb, var(--df-primary) 10%, transparent)"
                       : undefined,
                 }}
-                onClick={() => setActiveMenu(activeMenu === item ? null : item)}
+                onClick={() => setActiveMenu(activeMenu === key ? null : key)}
               >
-                {item}
+                {label}
               </span>
-              {activeMenu === item && (
+              {activeMenu === key && (
                 <div
                   className="absolute top-full left-0 mt-1 rounded shadow-xl py-1 min-w-[180px] z-50 border"
                   style={{ backgroundColor: "var(--df-bg-panel)", borderColor: "var(--df-border)" }}
                 >
-                  <MenuContent items={menus[item]} onClose={() => setActiveMenu(null)} />
+                  <MenuContent items={menus[key]} onClose={() => setActiveMenu(null)} />
                 </div>
               )}
             </div>

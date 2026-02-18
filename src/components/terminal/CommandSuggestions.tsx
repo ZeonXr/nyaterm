@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import type { FuzzyResult } from "../../types";
 
 interface CommandSuggestionsProps {
@@ -52,6 +53,7 @@ function CommandSuggestions({
   onSelect,
   onDismiss: _onDismiss,
 }: CommandSuggestionsProps) {
+  const { t } = useTranslation();
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
 
@@ -93,9 +95,9 @@ function CommandSuggestions({
         style={{ color: "var(--df-text-dimmed)", borderColor: "var(--df-border)" }}
       >
         <span className="material-icons text-[12px]">history</span>
-        <span>History</span>
+        <span>{t("suggestions.history")}</span>
         <span className="ml-auto" style={{ color: "var(--df-text-dimmed)" }}>
-          {suggestions.length} match{suggestions.length !== 1 ? "es" : ""}
+          {suggestions.length} {suggestions.length !== 1 ? t("suggestions.matches") : t("suggestions.match")}
         </span>
       </div>
 
@@ -138,7 +140,7 @@ function CommandSuggestions({
           >
             ↑↓
           </kbd>{" "}
-          select
+          {t("suggestions.select")}
         </span>
         <span>
           <kbd
@@ -147,7 +149,7 @@ function CommandSuggestions({
           >
             Enter
           </kbd>{" "}
-          execute
+          {t("suggestions.execute")}
         </span>
         <span>
           <kbd
@@ -156,7 +158,7 @@ function CommandSuggestions({
           >
             Tab
           </kbd>{" "}
-          fill
+          {t("suggestions.fill")}
         </span>
         <span>
           <kbd
@@ -165,7 +167,7 @@ function CommandSuggestions({
           >
             Esc
           </kbd>{" "}
-          dismiss
+          {t("suggestions.dismiss")}
         </span>
       </div>
     </div>

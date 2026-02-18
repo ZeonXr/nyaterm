@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useApp } from "../../context/AppContext";
 import { invoke } from "../../lib/invoke";
 import { logger } from "../../lib/logger";
@@ -22,6 +23,7 @@ export default function SavedConnections({
   onSessionCreated,
 }: SavedConnectionsProps) {
   const { savedConnections, savedGroups, refreshConnections } = useApp();
+  const { t } = useTranslation();
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
@@ -70,7 +72,7 @@ export default function SavedConnections({
       onSessionCreated(sessionId, conn.name, "SSH");
     } catch (e) {
       logger.error(`SSH connection failed for "${conn.name}"`, e);
-      toast.error(`Connection failed: ${e}`);
+      toast.error(t("savedConnections.connectionFailed", { error: e }));
       onEditConnection(conn);
     } finally {
       setConnectingId(null);
@@ -83,7 +85,7 @@ export default function SavedConnections({
       await invoke("delete_connection", { id });
       refreshConnections();
     } catch (e) {
-      toast.error(`Failed to delete connection: ${e}`);
+      toast.error(t("savedConnections.deleteFailed", { error: e }));
     }
   };
 
@@ -135,7 +137,7 @@ export default function SavedConnections({
         <button
           className="p-0.5 transition-colors hover:opacity-80"
           style={{ color: "var(--df-text-dimmed)" }}
-          title="Connect"
+          title={t("savedConnections.connect")}
           onClick={(e) => {
             e.stopPropagation();
             handleConnect(conn);
@@ -146,7 +148,7 @@ export default function SavedConnections({
         <button
           className="p-0.5 transition-colors hover:opacity-80"
           style={{ color: "var(--df-text-dimmed)" }}
-          title="Edit"
+          title={t("savedConnections.edit")}
           onClick={(e) => handleEdit(e, conn)}
         >
           <span className="material-icons text-sm">edit</span>
@@ -154,7 +156,7 @@ export default function SavedConnections({
         <button
           className="p-0.5 hover:text-red-400 transition-colors"
           style={{ color: "var(--df-text-dimmed)" }}
-          title="Delete"
+          title={t("savedConnections.delete")}
           onClick={(e) => handleDelete(e, conn.id)}
         >
           <span className="material-icons text-sm">delete</span>
@@ -173,7 +175,7 @@ export default function SavedConnections({
           backgroundColor: "var(--df-bg-section-header)",
         }}
       >
-        <span>Saved Connections</span>
+        <span>{t("panel.savedConnections")}</span>
         <span className="text-[10px] font-normal" style={{ color: "var(--df-text-dimmed)" }}>
           {savedConnections.length}
         </span>
@@ -181,7 +183,7 @@ export default function SavedConnections({
       <div className="flex-1 overflow-y-auto p-1.5 text-xs space-y-0.5 terminal-scroll">
         {savedConnections.length === 0 ? (
           <div className="text-center py-4 text-[11px]" style={{ color: "var(--df-text-dimmed)" }}>
-            No saved connections
+            {t("panel.noSavedConnections")}
           </div>
         ) : (
           <>
@@ -264,7 +266,7 @@ export default function SavedConnections({
               <div className="space-y-1.5 text-[10px]">
                 <div className="flex items-center gap-2">
                   <span className="w-12 shrink-0" style={{ color: "var(--df-text-dimmed)" }}>
-                    Host
+                    {t("savedConnections.host")}
                   </span>
                   <span className="truncate" style={{ color: "var(--df-text)" }}>
                     {hoverInfo.conn.host}
@@ -272,13 +274,13 @@ export default function SavedConnections({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-12 shrink-0" style={{ color: "var(--df-text-dimmed)" }}>
-                    Port
+                    {t("savedConnections.port")}
                   </span>
                   <span style={{ color: "var(--df-text)" }}>{hoverInfo.conn.port}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-12 shrink-0" style={{ color: "var(--df-text-dimmed)" }}>
-                    User
+                    {t("savedConnections.user")}
                   </span>
                   <span className="truncate" style={{ color: "var(--df-text)" }}>
                     {hoverInfo.conn.username}
@@ -286,7 +288,7 @@ export default function SavedConnections({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-12 shrink-0" style={{ color: "var(--df-text-dimmed)" }}>
-                    Auth
+                    {t("savedConnections.auth")}
                   </span>
                   <span className="capitalize" style={{ color: "var(--df-text)" }}>
                     {hoverInfo.conn.auth_type}
@@ -295,7 +297,7 @@ export default function SavedConnections({
                 {hoverInfo.conn.group && (
                   <div className="flex items-center gap-2">
                     <span className="w-12 shrink-0" style={{ color: "var(--df-text-dimmed)" }}>
-                      Group
+                      {t("savedConnections.group")}
                     </span>
                     <span className="truncate" style={{ color: "var(--df-text)" }}>
                       {hoverInfo.conn.group}

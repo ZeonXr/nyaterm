@@ -1,6 +1,7 @@
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import pkg from "../../../package.json";
 import DragonflyLogo from "../DragonflyLogo";
 
@@ -10,6 +11,7 @@ interface AboutDialogProps {
 }
 
 export default function AboutDialog({ open, onClose }: AboutDialogProps) {
+    const { t } = useTranslation();
     const [appName, setAppName] = useState("Dragonfly");
     const [appVersion, setAppVersion] = useState("0.1.0");
 
@@ -40,7 +42,7 @@ export default function AboutDialog({ open, onClose }: AboutDialogProps) {
                 </div>
 
                 <p className="text-xs text-center px-4 leading-relaxed" style={{ color: "var(--df-text-dimmed)" }}>
-                    A modern, high-performance SSH client built with Tauri and React.
+                    {t("about.description")}
                 </p>
 
                 <div className="flex gap-3 w-full pt-2">
@@ -49,14 +51,14 @@ export default function AboutDialog({ open, onClose }: AboutDialogProps) {
                         style={{ borderColor: "var(--df-border)", color: "var(--df-text)" }}
                         onClick={() => openUrl(pkg.homepage)}
                     >
-                        Website
+                        {t("about.website")}
                     </button>
                     <button
                         className="flex-1 py-2 text-xs font-medium rounded border transition-colors hover:bg-white/5"
                         style={{ borderColor: "var(--df-border)", color: "var(--df-text)" }}
                         onClick={() => openUrl(pkg.bugs.url)}
                     >
-                        Issues
+                        {t("about.issues")}
                     </button>
                 </div>
 
@@ -69,7 +71,7 @@ export default function AboutDialog({ open, onClose }: AboutDialogProps) {
                         }}
                         onClick={onClose}
                     >
-                        Close
+                        {t("about.close")}
                     </button>
                 </div>
             </div>

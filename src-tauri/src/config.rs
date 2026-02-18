@@ -173,10 +173,16 @@ pub struct UiConfig {
     pub zoom_level: f64,
     #[serde(default = "default_theme")]
     pub theme: Option<String>,
+    #[serde(default = "default_language")]
+    pub language: Option<String>,
 }
 
 fn default_theme() -> Option<String> {
     Some("github-dark".to_string())
+}
+
+fn default_language() -> Option<String> {
+    Some("en".to_string())
 }
 
 impl Default for UiConfig {
@@ -194,6 +200,7 @@ impl Default for UiConfig {
             show_quick_commands: true,
             zoom_level: 1.0,
             theme: Some("github-dark".to_string()),
+            language: Some("en".to_string()),
         }
     }
 }
