@@ -21,11 +21,11 @@ interface AppContextType {
 
   // UI Config
   uiConfig: UiConfig;
-  updateUiConfig: (updates: Partial<UiConfig>) => void;
+  updateUiConfig: (updates: Partial<UiConfig> | ((prev: UiConfig) => Partial<UiConfig>)) => void;
 
   // App Settings
   appSettings: AppSettings;
-  updateAppSettings: (updates: Partial<AppSettings>) => void;
+  updateAppSettings: (updates: Partial<AppSettings> | ((prev: AppSettings) => Partial<AppSettings>)) => void;
 
   // Data
   savedConnections: SavedConnection[];
@@ -176,9 +176,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // 2. Save UI Config Debounced
-  const updateUiConfig = useCallback((updates: Partial<UiConfig>) => {
+  const updateUiConfig = useCallback((updates: Partial<UiConfig> | ((prev: UiConfig) => Partial<UiConfig>)) => {
     setUiConfig((prev) => {
-      const next = { ...prev, ...updates };
+      const nextUpdates = typeof updates === "function" ? updates(prev) : updates;
+      const next = { ...prev, ...nextUpdates };
       // Debounce save
       if (uiConfigLoaded.current) {
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -193,9 +194,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // 2.5 Save App Settings Debounced
-  const updateAppSettings = useCallback((updates: Partial<AppSettings>) => {
+  const updateAppSettings = useCallback((updates: Partial<AppSettings> | ((prev: AppSettings) => Partial<AppSettings>)) => {
     setAppSettings((prev) => {
-      const next = { ...prev, ...updates };
+      const nextUpdates = typeof updates === "function" ? updates(prev) : updates;
+      const next = { ...prev, ...nextUpdates };
       if (appSettingsLoaded.current) {
         if (appSettingsSaveTimerRef.current) clearTimeout(appSettingsSaveTimerRef.current);
         appSettingsSaveTimerRef.current = setTimeout(() => {

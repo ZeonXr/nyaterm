@@ -4,10 +4,9 @@
 
 use crate::error::{AppError, AppResult};
 use crate::session::{SessionCommand, SessionHandle, SessionInfo, SessionManager, SessionType};
-use async_trait::async_trait;
 use russh::client;
 use russh::ChannelMsg;
-use russh_keys::PublicKeyBase64;
+use russh::keys::PublicKeyBase64;
 use serde::Deserialize;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
@@ -57,13 +56,12 @@ impl SshHandler {
     }
 }
 
-#[async_trait]
 impl client::Handler for SshHandler {
     type Error = russh::Error;
 
     async fn check_server_key(
         &mut self,
-        server_public_key: &russh_keys::key::PublicKey,
+        server_public_key: &russh::keys::PublicKey,
     ) -> Result<bool, Self::Error> {
         let path = match self.get_known_hosts_path() {
             Some(p) => p,
@@ -74,9 +72,9 @@ impl client::Handler for SshHandler {
             let _ = std::fs::create_dir_all(parent);
         }
 
-        let key_type = server_public_key.name();
+        let key_type = server_public_key.algorithm().to_string();
         let key_base64 = server_public_key.public_key_base64();
-        let fingerprint = server_public_key.fingerprint();
+        let fingerprint = server_public_key.fingerprint(Default::default());
 
         let host_identifier = if self.port != 22 {
             format!("[{}]:{}", self.host, self.port)
@@ -193,7 +191,7 @@ pub async fn create_ssh_session(
                 .authenticate_password(&config.username, password)
                 .await
                 .map_err(|e| AppError::Auth(format!("Authentication failed: {}", e)))?;
-            if !authenticated {
+            if !authenticated.success() {
                 return Err(AppError::Auth(
                     "Authentication failed: invalid credentials".to_string(),
                 ));
@@ -203,12 +201,13 @@ pub async fn create_ssh_session(
             key_data,
             passphrase,
         } => {
-            let key = russh_keys::decode_secret_key(key_data, passphrase.as_deref())?;
+            let key = russh::keys::decode_secret_key(key_data, passphrase.as_deref())?;
+            let hash_alg = handle.best_supported_rsa_hash().await.ok().flatten().flatten();
             let authenticated = handle
-                .authenticate_publickey(&config.username, Arc::new(key))
+                .authenticate_publickey(&config.username, russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), hash_alg))
                 .await
                 .map_err(|e| AppError::Auth(format!("Key authentication failed: {}", e)))?;
-            if !authenticated {
+            if !authenticated.success() {
                 return Err(AppError::Auth(
                     "Authentication failed: key rejected".to_string(),
                 ));

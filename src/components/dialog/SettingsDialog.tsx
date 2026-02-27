@@ -93,7 +93,7 @@ export default function SettingsDialog() {
     <Dialog open={showSettingsDialog} onOpenChange={(v) => !v && setShowSettingsDialog(false)}>
       <DialogContent
         aria-describedby={undefined}
-        className="w-full max-w-3xl sm:max-w-3xl h-[80vh] p-0 gap-0 flex flex-col sm:flex-row overflow-hidden"
+        className="w-full max-w-3xl sm:max-w-3xl h-[60vh] p-0 gap-0 flex flex-col sm:flex-row overflow-hidden"
         showCloseButton={false}
         style={{ fontFamily: appSettings.appearance.font_family }}
       >

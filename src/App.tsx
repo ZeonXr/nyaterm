@@ -115,57 +115,60 @@ function App() {
   // Resize handlers
   const handleLeftResize = useCallback(
     (delta: number) => {
-      updateUiConfig({ left_width: Math.max(160, Math.min(480, uiConfig.left_width + delta)) });
+      updateUiConfig((prev) => ({
+        left_width: Math.max(160, Math.min(480, (prev.left_width || 256) + delta)),
+      }));
     },
-    [updateUiConfig, uiConfig.left_width],
+    [updateUiConfig],
   );
 
   const handleRightResize = useCallback(
     (delta: number) => {
-      updateUiConfig({ right_width: Math.max(200, Math.min(480, uiConfig.right_width - delta)) });
+      updateUiConfig((prev) => ({
+        right_width: Math.max(200, Math.min(480, (prev.right_width || 288) - delta)),
+      }));
     },
-    [updateUiConfig, uiConfig.right_width],
+    [updateUiConfig],
   );
 
   const handleSavedConnResize = useCallback(
     (delta: number) => {
-      updateUiConfig({
-        saved_conn_height: Math.max(80, Math.min(500, uiConfig.saved_conn_height + delta)),
-      });
+      updateUiConfig((prev) => ({
+        saved_conn_height: Math.max(80, Math.min(500, (prev.saved_conn_height || 240) + delta)),
+      }));
     },
-    [updateUiConfig, uiConfig.saved_conn_height],
+    [updateUiConfig],
   );
 
   const handleHistoryResize = useCallback(
     (delta: number) => {
       // delta > 0 means mouse moves down → shrink history (it's at the bottom in flex col, but here it's actually growing/shrinking height)
-      // Checking previous logic: setHistoryHeight((h) => Math.max(80, Math.min(500, h - delta)));
-      updateUiConfig({
-        history_height: Math.max(80, Math.min(500, uiConfig.history_height - delta)),
-      });
+      updateUiConfig((prev) => ({
+        history_height: Math.max(80, Math.min(500, (prev.history_height || 200) - delta)),
+      }));
     },
-    [updateUiConfig, uiConfig.history_height],
+    [updateUiConfig],
   );
 
   const handleQuickCmdResize = useCallback(
     (delta: number) => {
-      updateUiConfig({
-        quick_cmd_height: Math.max(36, Math.min(300, uiConfig.quick_cmd_height - delta)),
-      });
+      updateUiConfig((prev) => ({
+        quick_cmd_height: Math.max(36, Math.min(300, (prev.quick_cmd_height || 36) - delta)),
+      }));
     },
-    [updateUiConfig, uiConfig.quick_cmd_height],
+    [updateUiConfig],
   );
 
   const handleFileTransferResize = useCallback(
     (delta: number) => {
-      updateUiConfig({
+      updateUiConfig((prev) => ({
         file_transfer_height: Math.max(
           80,
-          Math.min(500, (uiConfig.file_transfer_height || 240) - delta),
+          Math.min(500, (prev.file_transfer_height || 240) - delta),
         ),
-      });
+      }));
     },
-    [updateUiConfig, uiConfig.file_transfer_height],
+    [updateUiConfig],
   );
 
   return (
@@ -319,82 +322,82 @@ function App() {
           {(uiConfig.show_saved_connections ||
             uiConfig.show_active_sessions ||
             uiConfig.show_command_history) && (
-            <>
-              {/* Only show resize handle on desktop */}
-              <ResizeHandle
-                direction="horizontal"
-                onResize={handleRightResize}
-                className="hidden md:block"
-              />
-              <aside
-                style={{
-                  width: uiConfig.right_width,
-                  backgroundColor: "var(--df-bg-panel)",
-                  borderColor: "var(--df-border)",
-                }}
-                className={`
+              <>
+                {/* Only show resize handle on desktop */}
+                <ResizeHandle
+                  direction="horizontal"
+                  onResize={handleRightResize}
+                  className="hidden md:block"
+                />
+                <aside
+                  style={{
+                    width: uiConfig.right_width,
+                    backgroundColor: "var(--df-bg-panel)",
+                    borderColor: "var(--df-border)",
+                  }}
+                  className={`
                   fixed inset-y-0 right-0 z-50 flex flex-col shadow-xl transition-transform duration-200 border-l
                   md:relative md:translate-x-0 md:z-0 md:shadow-none
                   ${mobileRightOpen ? "translate-x-0" : "translate-x-full"}
                 `}
-              >
-                {/* Mobile placeholder for header height if needed, or close button */}
-                <div
-                  className="md:hidden h-10 flex items-center justify-end px-2 border-b shrink-0"
-                  style={{ borderColor: "var(--df-border)" }}
                 >
-                  <button
-                    onClick={() => setMobileRightOpen(false)}
-                    style={{ color: "var(--df-text-muted)" }}
+                  {/* Mobile placeholder for header height if needed, or close button */}
+                  <div
+                    className="md:hidden h-10 flex items-center justify-end px-2 border-b shrink-0"
+                    style={{ borderColor: "var(--df-border)" }}
                   >
-                    <MdClose />
-                  </button>
-                </div>
-
-                {/* Saved Connections - fixed pixel height at top */}
-                {uiConfig.show_saved_connections && (
-                  <>
-                    <div
-                      style={{ height: uiConfig.saved_conn_height }}
-                      className="shrink-0 overflow-hidden"
+                    <button
+                      onClick={() => setMobileRightOpen(false)}
+                      style={{ color: "var(--df-text-muted)" }}
                     >
-                      <SavedConnections
-                        onEditConnection={handleEditConnection}
-                        onSessionCreated={handleSessionConnected}
-                      />
-                    </div>
-                    {/* Show resize handle only if there's something below it */}
-                    {(uiConfig.show_active_sessions || uiConfig.show_command_history) && (
-                      <ResizeHandle direction="vertical" onResize={handleSavedConnResize} />
-                    )}
-                  </>
-                )}
-
-                {/* Active Sessions - flexible middle */}
-                {uiConfig.show_active_sessions && (
-                  <div className="flex-1 min-h-0 overflow-hidden">
-                    <ActiveSessions onSessionClick={handleSessionClick} />
+                      <MdClose />
+                    </button>
                   </div>
-                )}
 
-                {/* Command History - fixed pixel height at bottom */}
-                {uiConfig.show_command_history && (
-                  <>
-                    {/* Show resize handle only if there's something above it */}
-                    {(uiConfig.show_saved_connections || uiConfig.show_active_sessions) && (
-                      <ResizeHandle direction="vertical" onResize={handleHistoryResize} />
-                    )}
-                    <div
-                      style={{ height: uiConfig.history_height }}
-                      className="shrink-0 overflow-hidden"
-                    >
-                      <CommandHistory onCommandSend={handleHistoryCommand} />
+                  {/* Saved Connections - fixed pixel height at top */}
+                  {uiConfig.show_saved_connections && (
+                    <>
+                      <div
+                        style={{ height: uiConfig.saved_conn_height }}
+                        className="shrink-0 overflow-hidden"
+                      >
+                        <SavedConnections
+                          onEditConnection={handleEditConnection}
+                          onSessionCreated={handleSessionConnected}
+                        />
+                      </div>
+                      {/* Show resize handle only if there's something below it */}
+                      {(uiConfig.show_active_sessions || uiConfig.show_command_history) && (
+                        <ResizeHandle direction="vertical" onResize={handleSavedConnResize} />
+                      )}
+                    </>
+                  )}
+
+                  {/* Active Sessions - flexible middle */}
+                  {uiConfig.show_active_sessions && (
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <ActiveSessions onSessionClick={handleSessionClick} />
                     </div>
-                  </>
-                )}
-              </aside>
-            </>
-          )}
+                  )}
+
+                  {/* Command History - fixed pixel height at bottom */}
+                  {uiConfig.show_command_history && (
+                    <>
+                      {/* Show resize handle only if there's something above it */}
+                      {(uiConfig.show_saved_connections || uiConfig.show_active_sessions) && (
+                        <ResizeHandle direction="vertical" onResize={handleHistoryResize} />
+                      )}
+                      <div
+                        style={{ height: uiConfig.history_height }}
+                        className="shrink-0 overflow-hidden"
+                      >
+                        <CommandHistory onCommandSend={handleHistoryCommand} />
+                      </div>
+                    </>
+                  )}
+                </aside>
+              </>
+            )}
         </main>
 
         {/* Status Bar */}

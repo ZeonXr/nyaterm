@@ -96,7 +96,7 @@ async fn open_sftp(
                 .authenticate_password(&config.username, password)
                 .await
                 .map_err(|e| AppError::Auth(format!("Auth failed: {}", e)))?;
-            if !ok {
+            if !ok.success() {
                 return Err(AppError::Auth(
                     "Auth failed: invalid credentials".to_string(),
                 ));
@@ -106,12 +106,13 @@ async fn open_sftp(
             key_data,
             passphrase,
         } => {
-            let key = russh_keys::decode_secret_key(key_data, passphrase.as_deref())?;
+            let key = russh::keys::decode_secret_key(key_data, passphrase.as_deref())?;
+            let hash_alg = handle.best_supported_rsa_hash().await.ok().flatten().flatten();
             let ok = handle
-                .authenticate_publickey(&config.username, Arc::new(key))
+                .authenticate_publickey(&config.username, russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), hash_alg))
                 .await
                 .map_err(|e| AppError::Auth(format!("Key auth failed: {}", e)))?;
-            if !ok {
+            if !ok.success() {
                 return Err(AppError::Auth("Auth failed: key rejected".to_string()));
             }
         }

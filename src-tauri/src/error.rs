@@ -14,7 +14,7 @@ pub enum AppError {
     Ssh(#[from] russh::Error),
 
     #[error("SSH key error: {0}")]
-    SshKey(#[from] russh_keys::Error),
+    SshKey(#[from] russh::keys::Error),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
