@@ -63,7 +63,7 @@ function TabBar({ tabs, activeTabId, onTabChange, onTabClose, onAddTab }: TabBar
       {tabs.map((tab) => (
         <div
           key={tab.id}
-          className={`group flex items-center px-4 gap-2 border-r text-xs font-medium cursor-pointer transition-colors ${activeTabId === tab.id ? "active-tab" : ""
+          className={`group flex items-center pl-3 pr-2 gap-2 border-r text-xs font-medium cursor-pointer transition-colors ${activeTabId === tab.id ? "active-tab" : ""
             } ${activeTabId !== tab.id ? "df-hover" : ""}`}
           style={{
             borderColor: "var(--df-border)",
@@ -73,11 +73,12 @@ function TabBar({ tabs, activeTabId, onTabChange, onTabClose, onAddTab }: TabBar
         >
           {renderTabIcon(tab)}
           <span className="whitespace-nowrap max-w-[160px] truncate">{tab.name}</span>
-          <MdClose
-            className="text-[0.625rem] hover:text-red-500 transition-colors"
-            style={{ color: "var(--df-text-dimmed)" }}
+          <div
+            className="flex items-center justify-center w-[18px] h-[18px] rounded transition-all duration-200 ml-0.5 text-[var(--df-text-dimmed)] hover:text-red-500 hover:bg-red-500/10 active:bg-red-500/20 active:scale-90"
             onClick={(e) => handleClose(e, tab)}
-          />
+          >
+            <MdClose className="text-[12px]" />
+          </div>
         </div>
       ))}
       <button
