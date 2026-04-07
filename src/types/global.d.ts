@@ -54,6 +54,16 @@ export interface SshKey {
   passphrase?: string;
 }
 
+/** Managed password entry stored in passwords.json. */
+export interface SavedPassword {
+  id: string;
+  name: string;
+  /** True when encrypted password data exists on disk. */
+  has_password?: boolean;
+  /** Plaintext password (only sent when creating/updating). */
+  password?: string;
+}
+
 /** Stored SSH connection with host, auth, and optional group. */
 export interface SavedConnection {
   id: string;
@@ -64,7 +74,8 @@ export interface SavedConnection {
   port: number;
   username: string;
   auth_type: string;
-  password?: string;
+  /** References a managed password by id. */
+  password_id?: string;
   /** References a managed SSH key by id. */
   key_id?: string;
   sort_order?: number;

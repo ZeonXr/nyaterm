@@ -19,7 +19,8 @@
     "deletingSuccess": "Deleted successfully!",
     "deletingFailed": "Deletion failed: {{error}}",
     "unknownWindowType": "Unknown window type",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "close": "Close"
   },
   "menu": {
     "file": "File",
@@ -40,6 +41,9 @@
     "resetZoom": "Reset Zoom",
     "resetLayout": "Reset Panel Layout",
     "fullscreen": "Fullscreen",
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
     "newLocalTerminal": "New Local Terminal",
     "documentation": "Documentation",
     "checkForUpdates": "Check for Updates",
@@ -55,7 +59,38 @@
     "quickCommands": "Quick Commands",
     "noSavedConnections": "No saved connections",
     "noActiveSessions": "No active sessions",
-    "noCommandsYet": "No commands yet"
+    "noCommandsYet": "No commands yet",
+    "resourceMonitor": "Resource Monitor",
+    "resourceMonitorNoSession": "Connect to an SSH session to view resource usage",
+    "resourceMonitorDisabled": "Enable \"Show Remote Resource Stats\" in Settings to use this feature",
+    "resourceMonitorError": "Failed to fetch resource stats"
+  },
+  "resourceMonitor": {
+    "system": "System",
+    "hostname": "Hostname",
+    "uptime": "Uptime",
+    "os": "OS",
+    "arch": "Architecture",
+    "systemLoad": "System Load",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "network": "Network",
+    "disk": "Disk",
+    "used": "Used",
+    "available": "Available",
+    "cached": "Cache",
+    "send": "Send",
+    "receive": "Receive",
+    "nic": "NIC",
+    "mountPath": "Mount Path",
+    "totalSize": "Total Size",
+    "availSpace": "Available",
+    "usagePercent": "Usage",
+    "day": "{{count}} day",
+    "days": "{{count}} days",
+    "Load1": "1 min",
+    "Load5": "5 mins",
+    "Load15": "15 mins"
   },
   "dialog": {
     "editConnection": "Edit Connection",
@@ -75,6 +110,9 @@
     "selectKey": "Select Key",
     "noKeys": "No keys configured",
     "manageKeys": "Manage Keys...",
+    "selectPassword": "Select Password",
+    "noPasswords": "No passwords configured",
+    "managePasswords": "Manage Passwords...",
     "description": "Description",
     "descriptionPlaceholder": "e.g. Web server for project X",
     "serverPlaceholder": "My Server",
@@ -117,6 +155,9 @@
   "terminal": {
     "newConnection": "New Connection",
     "sessionDisconnected": "Session disconnected",
+    "pressEnterToReconnect": "Press Enter to reconnect",
+    "reconnecting": "Reconnecting...",
+    "reconnectFailed": "Reconnect failed",
     "linkOpenHint": "{{modifier}}+Click to open link",
     "actionLinkKind_ip": "IPv4",
     "actionLinkKind_hostPort": "Host:Port",
@@ -187,7 +228,8 @@
     "permSticky": "Sticky",
     "octal": "Octal",
     "downloadSelected": "Download Selected",
-    "upload": "Upload",
+    "upload": "Upload Files",
+    "uploadFolder": "Upload Folder",
     "newFile": "New File",
     "newFolder": "New Folder",
     "delete": "Delete",
@@ -372,7 +414,9 @@
     "hardwareAcceleration": "Hardware Acceleration",
     "hardwareAccelerationDesc": "Use GPU for terminal rendering (WebGL/Canvas). Requires restart.",
     "showRemoteStats": "Show Remote Resource Stats",
-    "showRemoteStatsDesc": "Display CPU and memory usage of the active SSH host in the status bar. Polls every 10 seconds via a separate SSH connection.",
+    "showRemoteStatsDesc": "Display resource usage of the active SSH host in the Resource Monitor panel.",
+    "remoteStatsInterval": "Stats Polling Interval (seconds)",
+    "remoteStatsIntervalDesc": "How often to fetch resource usage from the remote host. Default: 3 seconds.",
     "actionLinks": "Action Links",
     "actionLinksDesc": "Recognize patterns (IP, archive, host:port, path) in terminal output. Ctrl/Cmd+Click to run the default command. Alt+Click to show all actions.",
     "actionLinksMatchers": "Enabled Matchers",
@@ -520,5 +564,28 @@
     "unlock": "Unlock",
     "passwordPlaceholder": "Enter unlock password",
     "wrongPassword": "Incorrect password, please try again."
+  },
+  "securityAuth": {
+    "title": "Security Authentication",
+    "passwords": "Passwords",
+    "keys": "Keys"
+  },
+  "passwordManager": {
+    "title": "Password Manager",
+    "add": "Add Password",
+    "namePlaceholder": "e.g. Production Server",
+    "passwordPlaceholder": "Enter password",
+    "passwordUnchanged": "Leave empty to keep current password",
+    "noPasswords": "No passwords stored.",
+    "deleteTitle": "Delete Password",
+    "deleteConfirm": "Are you sure you want to delete password '{{name}}'?"
+  },
+  "activityBar": {
+    "moveTo": "Move to",
+    "leftTop": "Left Top",
+    "leftBottom": "Left Bottom",
+    "rightTop": "Right Top",
+    "rightBottom": "Right Bottom",
+    "showLabel": "Show Tool Name"
   }
 }

@@ -19,7 +19,8 @@
     "deletingSuccess": "删除成功！",
     "deletingFailed": "删除失败：{{error}}",
     "unknownWindowType": "未知窗口类型",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "close": "关闭"
   },
   "menu": {
     "file": "文件",
@@ -40,6 +41,9 @@
     "resetZoom": "重置缩放",
     "resetLayout": "重置面板布局",
     "fullscreen": "全屏",
+    "minimize": "最小化",
+    "maximize": "最大化",
+    "restore": "还原",
     "newLocalTerminal": "新建本地终端",
     "documentation": "文档",
     "checkForUpdates": "检查更新",
@@ -55,7 +59,38 @@
     "quickCommands": "快捷命令",
     "noSavedConnections": "暂无已保存的连接",
     "noActiveSessions": "暂无活动会话",
-    "noCommandsYet": "暂无命令记录"
+    "noCommandsYet": "暂无命令记录",
+    "resourceMonitor": "资源监控",
+    "resourceMonitorNoSession": "连接 SSH 会话以查看资源使用情况",
+    "resourceMonitorDisabled": "请在设置中启用「显示远程资源统计」以使用此功能",
+    "resourceMonitorError": "获取资源统计失败"
+  },
+  "resourceMonitor": {
+    "system": "系统",
+    "hostname": "主机名称",
+    "uptime": "运行时长",
+    "os": "操作系统",
+    "arch": "系统架构",
+    "systemLoad": "系统负载",
+    "cpu": "CPU",
+    "memory": "内存",
+    "network": "网络",
+    "disk": "磁盘",
+    "used": "已使用",
+    "available": "剩余",
+    "cached": "缓存",
+    "send": "发送",
+    "receive": "接收",
+    "nic": "网卡",
+    "mountPath": "挂载路径",
+    "totalSize": "总计大小",
+    "availSpace": "剩余空间",
+    "usagePercent": "使用占比",
+    "day": "{{count}}天",
+    "days": "{{count}}天",
+    "Load1": "1分钟",
+    "Load5": "5分钟",
+    "Load15": "15分钟"
   },
   "dialog": {
     "editConnection": "编辑连接",
@@ -75,6 +110,9 @@
     "selectKey": "选择密钥",
     "noKeys": "暂无密钥",
     "manageKeys": "管理密钥...",
+    "selectPassword": "选择密码",
+    "noPasswords": "暂无密码",
+    "managePasswords": "管理密码...",
     "description": "描述",
     "descriptionPlaceholder": "例如：项目 X 的 Web 服务器",
     "serverPlaceholder": "我的服务器",
@@ -117,6 +155,9 @@
   "terminal": {
     "newConnection": "新建连接",
     "sessionDisconnected": "会话已断开",
+    "pressEnterToReconnect": "按回车键重新连接",
+    "reconnecting": "正在重新连接...",
+    "reconnectFailed": "重新连接失败",
     "linkOpenHint": "按住 {{modifier}} 并点击以打开链接",
     "actionLinkKind_ip": "IPv4",
     "actionLinkKind_hostPort": "Host:Port",
@@ -187,7 +228,8 @@
     "permSticky": "粘性",
     "octal": "八进制",
     "downloadSelected": "下载选中",
-    "upload": "上传",
+    "upload": "上传文件",
+    "uploadFolder": "上传文件夹",
     "newFile": "新建文件",
     "newFolder": "新建文件夹",
     "delete": "删除",
@@ -372,7 +414,9 @@
     "hardwareAcceleration": "硬件加速",
     "hardwareAccelerationDesc": "使用 GPU 进行终端渲染 (WebGL/Canvas)。需要重启。",
     "showRemoteStats": "显示远程资源信息",
-    "showRemoteStatsDesc": "在状态栏显示当前 SSH 主机的 CPU 和内存使用情况，每 10 秒通过独立 SSH 连接轮询一次。",
+    "showRemoteStatsDesc": "在资源监控面板显示当前 SSH 主机的资源使用情况。",
+    "remoteStatsInterval": "资源采集间隔（秒）",
+    "remoteStatsIntervalDesc": "从远程主机采集资源使用情况的频率。默认 3 秒。",
     "actionLinks": "快捷动作",
     "actionLinksDesc": "识别终端输出中的 IP、压缩包、host:port 和路径，并提供快捷操作。Ctrl/Cmd + 单击执行默认动作，Alt + 单击查看所有动作。",
     "actionLinksMatchers": "启用的匹配器",
@@ -520,5 +564,28 @@
     "unlock": "解锁",
     "passwordPlaceholder": "请输入解锁密码",
     "wrongPassword": "密码错误，请重试。"
+  },
+  "securityAuth": {
+    "title": "安全认证",
+    "passwords": "密码",
+    "keys": "密钥"
+  },
+  "passwordManager": {
+    "title": "密码管理器",
+    "add": "添加密码",
+    "namePlaceholder": "例如：生产服务器",
+    "passwordPlaceholder": "输入密码",
+    "passwordUnchanged": "留空保持当前密码不变",
+    "noPasswords": "暂无已存储的密码。",
+    "deleteTitle": "删除密码",
+    "deleteConfirm": "确定要删除密码「{{name}}」吗？"
+  },
+  "activityBar": {
+    "moveTo": "移动至",
+    "leftTop": "左侧顶部",
+    "leftBottom": "左侧底部",
+    "rightTop": "右侧顶部",
+    "rightBottom": "右侧底部",
+    "showLabel": "显示工具名称"
   }
 }

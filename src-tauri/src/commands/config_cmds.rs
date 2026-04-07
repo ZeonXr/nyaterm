@@ -1,14 +1,11 @@
-use crate::config::{self, Group, QuickCommandsConfig, SavedConnection, SshKey};
+use crate::config::{self, Group, QuickCommandsConfig, SavedConnection, SavedPassword, SshKey};
 use crate::crypto;
 use crate::error::{AppError, AppResult};
 use tauri::Emitter;
 
 #[tauri::command]
 pub fn get_saved_connections(app: tauri::AppHandle) -> AppResult<Vec<SavedConnection>> {
-    let mut cfg = config::load_config(&app)?;
-    for conn in &mut cfg.connections {
-        conn.password = None;
-    }
+    let cfg = config::load_config(&app)?;
     Ok(cfg.connections)
 }
 
@@ -22,10 +19,10 @@ pub fn save_connection(app: tauri::AppHandle, mut connection: SavedConnection) -
     let target_id = connection.id.clone();
     let existing = cfg.connections.iter().find(|c| c.id == target_id);
 
-    connection.password = match connection.password.as_deref() {
-        Some(plain) if !plain.is_empty() => Some(crypto::encrypt(plain)?),
-        _ => existing.and_then(|e| e.password.clone()),
-    };
+    // Preserve existing password_id if not provided
+    if connection.password_id.is_none() {
+        connection.password_id = existing.and_then(|e| e.password_id.clone());
+    }
 
     if let Some(ex) = cfg.connections.iter_mut().find(|c| c.id == target_id) {
         *ex = connection;
@@ -200,4 +197,46 @@ pub fn get_quick_commands(app: tauri::AppHandle) -> AppResult<QuickCommandsConfi
 #[tauri::command]
 pub fn save_quick_commands(app: tauri::AppHandle, config: QuickCommandsConfig) -> AppResult<()> {
     crate::config::save_quick_commands(&app, &config)
+}
+
+// --- Password management ---
+
+#[tauri::command]
+pub fn get_saved_passwords(app: tauri::AppHandle) -> AppResult<Vec<SavedPassword>> {
+    let mut cfg = config::load_passwords(&app)?;
+    for p in &mut cfg.passwords {
+        p.password = None;
+    }
+    Ok(cfg.passwords)
+}
+
+#[tauri::command]
+pub fn save_password(app: tauri::AppHandle, mut entry: SavedPassword) -> AppResult<String> {
+    let mut cfg = config::load_passwords(&app)?;
+
+    if entry.id.is_empty() {
+        entry.id = uuid::Uuid::new_v4().to_string();
+    }
+    let target_id = entry.id.clone();
+    let existing = cfg.passwords.iter().find(|p| p.id == target_id);
+
+    entry.password = match entry.password.as_deref() {
+        Some(plain) if !plain.is_empty() => Some(crypto::encrypt(plain)?),
+        _ => existing.and_then(|e| e.password.clone()),
+    };
+
+    if let Some(ex) = cfg.passwords.iter_mut().find(|p| p.id == target_id) {
+        *ex = entry;
+    } else {
+        cfg.passwords.push(entry);
+    }
+    config::save_passwords(&app, &cfg)?;
+    Ok(target_id)
+}
+
+#[tauri::command]
+pub fn delete_password(app: tauri::AppHandle, id: String) -> AppResult<()> {
+    let mut cfg = config::load_passwords(&app)?;
+    cfg.passwords.retain(|p| p.id != id);
+    config::save_passwords(&app, &cfg)
 }

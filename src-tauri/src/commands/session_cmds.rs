@@ -16,14 +16,19 @@ pub async fn create_ssh_session(
     let conn = config::load_connection_by_id(&app, &connection_id)?;
 
     let auth = match conn.auth_type.as_str() {
-        "password" => SshAuth::Password {
-            password: conn.password.ok_or_else(|| {
+        "password" => {
+            let pw_id = conn.password_id.as_deref().ok_or_else(|| {
                 AppError::Auth(
                     "No password saved for this connection. Please edit and re-save it."
                         .to_string(),
                 )
-            })?,
-        },
+            })?;
+            let pw_entry = config::load_password_by_id(&app, pw_id)?;
+            let password = pw_entry.password.ok_or_else(|| {
+                AppError::Auth("Password entry has no stored password.".to_string())
+            })?;
+            SshAuth::Password { password }
+        }
         "key" => {
             let key_id = conn.key_id.as_deref().ok_or_else(|| {
                 AppError::Auth("No SSH key assigned to this connection.".to_string())

@@ -1,10 +1,9 @@
 use super::{get_config_dir, load_json, save_json, uuid_v4};
-use crate::crypto;
 use crate::error::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
-/// Saved SSH connection. Password is AES-256-GCM encrypted on disk.
+/// Saved SSH connection. Password-based auth references a managed password via `password_id`.
 /// Key-based auth references a managed key via `key_id`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SavedConnection {
@@ -20,9 +19,13 @@ pub struct SavedConnection {
     pub username: String,
     pub auth_type: String,
 
-    /// Ciphertext on disk; plaintext in memory after `load_connection_by_id`.
-    #[serde(default)]
+    /// Legacy field kept for deserialization during migration only.
+    #[serde(default, skip_serializing)]
     pub password: Option<String>,
+
+    /// References a managed password in passwords.json.
+    #[serde(default)]
+    pub password_id: Option<String>,
 
     /// References a managed key in keys.json.
     #[serde(default)]
@@ -60,43 +63,80 @@ pub struct SessionsConfig {
 /// Alias for the main app config (sessions + groups).
 pub type AppConfig = SessionsConfig;
 
-/// Decrypts `password` in-place (ciphertext → plaintext).
-///
-/// Called by `load_connection_by_id` before an SSH session is established.
-pub fn decrypt_credentials(conn: &mut SavedConnection) {
-    if let Some(ct) = conn.password.clone() {
-        conn.password = crypto::decrypt(&ct).ok();
-    }
-}
-
 pub fn load_sessions(app: &AppHandle) -> AppResult<SessionsConfig> {
     let dir = get_config_dir(app)?;
     let path = dir.join("sessions.json");
-    load_json(&path)
+    let cfg: SessionsConfig = load_json(&path)?;
+    Ok(cfg)
 }
 
-/// Saves sessions config to disk (encrypted credentials are inline).
+/// Saves sessions config to disk.
 pub fn save_sessions(app: &AppHandle, config: &SessionsConfig) -> AppResult<()> {
     let dir = get_config_dir(app)?;
     save_json(&dir.join("sessions.json"), config)
 }
 
 /// Loads the main app config (sessions + groups).
+/// Also runs one-time migration from inline `password` to `password_id`.
 pub fn load_config(app: &AppHandle) -> AppResult<AppConfig> {
-    load_sessions(app)
+    let mut cfg = load_sessions(app)?;
+
+    let needs_migration = cfg
+        .connections
+        .iter()
+        .any(|c| c.password.is_some() && c.password_id.is_none());
+
+    if needs_migration {
+        migrate_passwords_to_store(app, &mut cfg)?;
+    }
+
+    Ok(cfg)
 }
 
-/// Loads a single connection by ID and decrypts `password` for SSH auth.
+/// Migrates connections that still have an inline `password` field to use the password store.
+/// Creates a password entry for each, sets `password_id`, and clears the legacy field.
+fn migrate_passwords_to_store(app: &AppHandle, cfg: &mut SessionsConfig) -> AppResult<()> {
+    use super::passwords::{load_passwords, save_passwords, SavedPassword};
+
+    let mut pw_cfg = load_passwords(app)?;
+
+    for conn in &mut cfg.connections {
+        if let Some(encrypted_pw) = conn.password.take() {
+            if conn.password_id.is_some() {
+                continue;
+            }
+            let pw_id = uuid::Uuid::new_v4().to_string();
+            let entry = SavedPassword {
+                id: pw_id.clone(),
+                name: conn.name.clone(),
+                password: Some(encrypted_pw),
+                has_password: false,
+            };
+            pw_cfg.passwords.push(entry);
+
+            // Re-encrypt isn't needed — the password is already AES-GCM encrypted.
+            // We just move the ciphertext blob into the password store.
+            conn.password_id = Some(pw_id);
+        }
+    }
+
+    save_passwords(app, &pw_cfg)?;
+    save_sessions(app, cfg)?;
+
+    tracing::info!("Migrated inline passwords to password store");
+    Ok(())
+}
+
+/// Loads a single connection by ID.
 ///
 /// Returns `AppError::SessionNotFound` if no connection with that ID exists.
 pub fn load_connection_by_id(app: &AppHandle, id: &str) -> AppResult<SavedConnection> {
     let cfg = load_config(app)?;
-    let mut conn = cfg
+    let conn = cfg
         .connections
         .into_iter()
         .find(|c| c.id == id)
         .ok_or_else(|| AppError::SessionNotFound(format!("Connection '{}' not found", id)))?;
-    decrypt_credentials(&mut conn);
     Ok(conn)
 }
 

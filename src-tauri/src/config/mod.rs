@@ -3,12 +3,14 @@
 //! Stores JSON files in `~/.dragonfly/`. Credentials are AES-256-GCM encrypted in-place.
 
 mod keys;
+mod passwords;
 mod quick_commands;
 mod sessions;
 mod settings;
 mod ui;
 
 pub use keys::*;
+pub use passwords::*;
 pub use quick_commands::*;
 pub use sessions::*;
 pub use settings::*;

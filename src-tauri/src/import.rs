@@ -420,6 +420,7 @@ pub fn import_sessions(app: tauri::AppHandle, file_path: String) -> AppResult<us
             username: sess.username,
             auth_type: sess.auth_type,
             password: None,
+            password_id: None,
             key_id: None,
             sort_order: 0,
             icon: None,
