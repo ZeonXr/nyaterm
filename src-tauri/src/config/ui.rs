@@ -56,7 +56,11 @@ fn default_right_top() -> Vec<String> {
 }
 
 fn default_right_bottom() -> Vec<String> {
-    vec!["quickCmdBar".to_string(), "lock".to_string()]
+    vec![
+        "quickCmdBar".to_string(),
+        "recording".to_string(),
+        "lock".to_string(),
+    ]
 }
 
 /// Layout and theme preferences.

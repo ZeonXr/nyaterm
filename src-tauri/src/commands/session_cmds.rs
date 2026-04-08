@@ -3,6 +3,7 @@ use crate::crypto;
 use crate::error::{AppError, AppResult};
 use crate::fuzzy::{fuzzy_search_items, FuzzyResult};
 use crate::pty;
+use crate::recording::RecordingManager;
 use crate::session::{SessionCommand, SessionInfo, SessionManager};
 use crate::ssh::{self, SshAuth, SshConfig};
 use std::sync::Arc;
@@ -181,6 +182,31 @@ pub fn fuzzy_search_commands(
         .map(|c| (c.label, c.command))
         .collect();
     Ok(fuzzy_search_items(&items, &pattern, "quickCommand", limit))
+}
+
+#[tauri::command]
+pub async fn start_recording(
+    state: tauri::State<'_, Arc<RecordingManager>>,
+    session_id: String,
+    file_path: String,
+) -> AppResult<()> {
+    state.start(&session_id, &file_path)
+}
+
+#[tauri::command]
+pub async fn stop_recording(
+    state: tauri::State<'_, Arc<RecordingManager>>,
+    session_id: String,
+) -> AppResult<String> {
+    state.stop(&session_id)
+}
+
+#[tauri::command]
+pub async fn is_recording(
+    state: tauri::State<'_, Arc<RecordingManager>>,
+    session_id: String,
+) -> AppResult<bool> {
+    Ok(state.is_recording(&session_id))
 }
 
 /// Resolves a standalone proxy config for a saved connection, decrypting the password if present.

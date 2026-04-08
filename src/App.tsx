@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { downloadDir } from "@tauri-apps/api/path";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BiServer } from "react-icons/bi";
@@ -15,6 +16,8 @@ import {
   MdSettings,
   MdTerminal,
 } from "react-icons/md";
+import { PiRecordFill } from "react-icons/pi";
+import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import AboutDialog from "./components/dialog/app/AboutDialog";
 import LockScreen from "./components/dialog/app/LockScreen";
@@ -27,9 +30,9 @@ import CommandHistory from "./components/panel/CommandHistory";
 import FileExplorer from "./components/panel/FileExplorer";
 import FileTransfer from "./components/panel/FileTransfer";
 import NetworkPanel from "./components/panel/NetworkPanel";
-import SecurityAuthPanel from "./components/panel/SecurityAuthPanel";
 import ResourceMonitor from "./components/panel/ResourceMonitor";
 import SavedConnections from "./components/panel/SavedConnections";
+import SecurityAuthPanel from "./components/panel/SecurityAuthPanel";
 import QuickCommands from "./components/terminal/QuickCommands";
 import TabBar from "./components/terminal/TabBar";
 import XTerminal from "./components/terminal/XTerminal";
@@ -58,7 +61,7 @@ import type {
 } from "./types/global";
 
 /** Item IDs that are not regular panels — they have special action on click. */
-const NON_PANEL_IDS = new Set(["settings", "lock", "quickCmdBar"]);
+const NON_PANEL_IDS = new Set(["settings", "lock", "quickCmdBar", "recording"]);
 
 /** Determine which visual side (left/right) a given item currently lives on. */
 function getItemSide(id: string, layout: ActivityBarLayout): "left" | "right" | null {
@@ -108,6 +111,9 @@ function App() {
   const [mobileRightOpen, setMobileRightOpen] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const lastCtrlWheelZoomAtRef = useRef(0);
+
+  // Recording state: tracks which sessions are currently being recorded
+  const [recordingSessions, setRecordingSessions] = useState<Set<string>>(new Set());
 
   // Child window modal overlay
   const [childWindowCount, setChildWindowCount] = useState(0);
@@ -398,6 +404,42 @@ function App() {
     onLockScreen: handleLockScreen,
   });
 
+  // Recording toggle
+  const handleToggleRecording = useCallback(async () => {
+    if (!activeTab || activeTab.connecting) return;
+    const sessionId = activeTab.sessionId;
+    const isActive = recordingSessions.has(sessionId);
+
+    if (isActive) {
+      try {
+        const savedPath = await invoke<string>("stop_recording", { sessionId });
+        setRecordingSessions((prev) => {
+          const next = new Set(prev);
+          next.delete(sessionId);
+          return next;
+        });
+        toast.success(t("recording.saved", { path: savedPath }));
+      } catch (e) {
+        console.error("Failed to stop recording", e);
+      }
+    } else {
+      try {
+        const dir = appSettings.transfer.recording_path || (await downloadDir());
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        const safeName = (activeTab.name || "session").replace(/[^\w.-]/g, "_");
+        const filePath = `${dir}${dir.endsWith("\\") || dir.endsWith("/") ? "" : "/"}recording-${safeName}-${timestamp}.log`;
+        await invoke("start_recording", { sessionId, filePath });
+        setRecordingSessions((prev) => {
+          const next = new Set(prev);
+          next.add(sessionId);
+          return next;
+        });
+      } catch (e) {
+        console.error("Failed to start recording", e);
+      }
+    }
+  }, [activeTab, recordingSessions, appSettings.transfer.recording_path, t]);
+
   // Resize handlers
   const handleLeftResize = useCallback(
     (delta: number) => {
@@ -439,12 +481,52 @@ function App() {
       commandHistory: { icon: <MdHistory />, tooltip: t("panel.commandHistory") },
       resourceMonitor: { icon: <MdOutlineMonitorHeart />, tooltip: t("panel.resourceMonitor") },
       quickCmdBar: { icon: <MdBolt />, tooltip: t("panel.quickCommands") },
+      recording: {
+        icon: (
+          <PiRecordFill
+            className={
+              activeTab && recordingSessions.has(activeTab.sessionId) ? "animate-pulse" : undefined
+            }
+          />
+        ),
+        tooltip:
+          activeTab && recordingSessions.has(activeTab.sessionId)
+            ? t("recording.stop")
+            : t("recording.start"),
+      },
       lock: { icon: <MdLock />, tooltip: t("statusBar.lock") },
     }),
-    [t],
+    [activeTab, recordingSessions, t],
   );
 
   const layout = uiConfig.activity_bar_layout;
+
+  useEffect(() => {
+    const allIds = [
+      ...layout.left_top,
+      ...layout.left_bottom,
+      ...layout.right_top,
+      ...layout.right_bottom,
+    ];
+    if (allIds.includes("recording")) return;
+
+    updateUi((prev) => {
+      const nextRightBottom = [...prev.activity_bar_layout.right_bottom];
+      const lockIndex = nextRightBottom.indexOf("lock");
+      if (lockIndex === -1) {
+        nextRightBottom.push("recording");
+      } else {
+        nextRightBottom.splice(lockIndex, 0, "recording");
+      }
+
+      return {
+        activity_bar_layout: {
+          ...prev.activity_bar_layout,
+          right_bottom: nextRightBottom,
+        },
+      };
+    });
+  }, [layout.left_bottom, layout.left_top, layout.right_bottom, layout.right_top, updateUi]);
 
   const buildItems = useCallback(
     (ids: string[]): ActivityBarItem[] =>
@@ -468,8 +550,9 @@ function App() {
   const toggleActiveIds = useMemo(() => {
     const s = new Set<string>();
     if (uiConfig.show_quick_cmd_bar) s.add("quickCmdBar");
+    if (activeTab && recordingSessions.has(activeTab.sessionId)) s.add("recording");
     return s;
-  }, [uiConfig.show_quick_cmd_bar]);
+  }, [activeTab, recordingSessions, uiConfig.show_quick_cmd_bar]);
 
   // Unified item select — routes to left or right panel based on current layout position
   const handleItemSelect = useCallback(
@@ -486,6 +569,14 @@ function App() {
         updateUi((prev) => ({ show_quick_cmd_bar: !prev.show_quick_cmd_bar }));
         return;
       }
+      if (id === "recording") {
+        if (!activeTab || activeTab.connecting) {
+          toast.error(t("panel.noActiveSessions"));
+          return;
+        }
+        void handleToggleRecording();
+        return;
+      }
       const side = getItemSide(id, layout);
       if (side === "left") {
         updateUi((prev) => ({ active_left_panel: prev.active_left_panel === id ? null : id }));
@@ -493,7 +584,7 @@ function App() {
         updateUi((prev) => ({ active_right_panel: prev.active_right_panel === id ? null : id }));
       }
     },
-    [updateUi, setIsLocked, layout],
+    [activeTab, handleToggleRecording, layout, setIsLocked, t, updateUi],
   );
 
   // Reorder within a zone — uses prev to avoid stale closure
@@ -624,7 +715,7 @@ function App() {
             />
           )}
 
-          {/* Left Activity Bar (TA + TC) */}
+          {/* Left Activity Bar */}
           <ActivityBar
             items={leftTopItems}
             bottomItems={leftBottomItems}
@@ -808,7 +899,7 @@ function App() {
             </>
           )}
 
-          {/* Right Activity Bar (TB + TD) */}
+          {/* Right Activity Bar */}
           <ActivityBar
             items={rightTopItems}
             bottomItems={rightBottomItems}

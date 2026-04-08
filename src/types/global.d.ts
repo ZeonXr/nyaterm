@@ -333,6 +333,10 @@ export interface TransferSettings {
   default_file_permissions: string;
   max_transfer_retries: number;
   transfer_buffer_size: number;
+  download_path: string;
+  ask_save_location: boolean;
+  default_editor: string;
+  recording_path: string;
 }
 
 export interface TunnelConfig {

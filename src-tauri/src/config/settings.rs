@@ -353,6 +353,14 @@ pub struct TransferSettings {
     pub max_transfer_retries: u32,
     #[serde(default = "default_buffer_size")]
     pub transfer_buffer_size: u32,
+    #[serde(default)]
+    pub download_path: String,
+    #[serde(default = "default_false")]
+    pub ask_save_location: bool,
+    #[serde(default)]
+    pub default_editor: String,
+    #[serde(default)]
+    pub recording_path: String,
 }
 
 fn default_transfer_threads() -> u32 {
@@ -382,6 +390,10 @@ impl Default for TransferSettings {
             default_file_permissions: default_file_permissions(),
             max_transfer_retries: default_max_retries(),
             transfer_buffer_size: default_buffer_size(),
+            download_path: String::new(),
+            ask_save_location: false,
+            default_editor: String::new(),
+            recording_path: String::new(),
         }
     }
 }
@@ -507,6 +519,28 @@ pub fn load_app_settings(app: &AppHandle) -> AppResult<AppSettings> {
                 .activity_bar_layout
                 .left_top
                 .push("network".to_string());
+            migrated = true;
+        }
+    }
+
+    // Ensure "recording" is in right_bottom if not already in any zone
+    {
+        let all_ids: Vec<&str> = settings
+            .ui
+            .activity_bar_layout
+            .left_top
+            .iter()
+            .chain(&settings.ui.activity_bar_layout.left_bottom)
+            .chain(&settings.ui.activity_bar_layout.right_top)
+            .chain(&settings.ui.activity_bar_layout.right_bottom)
+            .map(|s| s.as_str())
+            .collect();
+        if !all_ids.contains(&"recording") {
+            settings
+                .ui
+                .activity_bar_layout
+                .right_bottom
+                .insert(1, "recording".to_string());
             migrated = true;
         }
     }

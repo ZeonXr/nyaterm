@@ -3,13 +3,14 @@
 //! Spawns the user's shell (PowerShell on Windows, $SHELL elsewhere) and bridges I/O to Tauri.
 
 use crate::error::AppResult;
+use crate::recording::RecordingManager;
 use crate::session::{
     SessionCommand, SessionHandle, SessionInfo, SessionManager, SessionType, SharedCwd,
 };
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
 
 /// Extracts the path from an OSC 7 sequence (same logic as ssh.rs).
@@ -202,6 +203,10 @@ fn pty_session_thread(
 
     let cwd_event = format!("cwd-changed-{}", session_id);
     let rt_for_reader = rt_handle.clone();
+    let recording_mgr_reader: Option<Arc<RecordingManager>> = app
+        .try_state::<Arc<RecordingManager>>()
+        .map(|s| s.inner().clone());
+    let sid_for_rec_reader = session_id.clone();
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
         let mut injecting = true;
@@ -228,6 +233,10 @@ fn pty_session_thread(
 
                     if text.is_empty() {
                         continue;
+                    }
+
+                    if let Some(ref rec) = recording_mgr_reader {
+                        rec.write_output(&sid_for_rec_reader, &text);
                     }
 
                     if let Some(path) = parse_osc7(&text) {
@@ -258,6 +267,9 @@ fn pty_session_thread(
         let _ = app_read.emit(&format!("session-closed-{}", sid_read), ());
     });
 
+    let recording_mgr: Option<Arc<RecordingManager>> = app
+        .try_state::<Arc<RecordingManager>>()
+        .map(|s| s.inner().clone());
     let output_event_cmd = format!("terminal-output-{}", session_id);
     while let Some(cmd) = cmd_rx.blocking_recv() {
         match cmd {
@@ -272,6 +284,9 @@ fn pty_session_thread(
                 }
             }
             SessionCommand::Write(data) => {
+                if let Some(ref rec) = recording_mgr {
+                    rec.write_input(&session_id, &data);
+                }
                 let _ = writer.write_all(&data);
                 let _ = writer.flush();
             }
@@ -287,6 +302,10 @@ fn pty_session_thread(
                 break;
             }
         }
+    }
+
+    if let Some(ref rec) = recording_mgr {
+        rec.cleanup_session(&session_id);
     }
 
     rt_handle.block_on(async {

@@ -1,3 +1,5 @@
+import { downloadDir } from "@tauri-apps/api/path";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   MdCheckCircle,
@@ -11,6 +13,7 @@ import {
   MdUpload,
 } from "react-icons/md";
 import PanelHeader from "@/components/layout/PanelHeader";
+import { useApp } from "@/context/AppContext";
 import { type TransferItem, useTransfer } from "../../context/TransferContext";
 
 interface FileTransferProps {
@@ -156,6 +159,16 @@ function TransferRow({ item }: { item: TransferItem }) {
 export default function FileTransfer({ activeSessionId }: FileTransferProps) {
   const { t } = useTranslation();
   const { transfers, clearCompleted, clearAll } = useTransfer();
+  const { appSettings } = useApp();
+  const [resolvedDownloadDir, setResolvedDownloadDir] = useState("");
+
+  useEffect(() => {
+    downloadDir()
+      .then(setResolvedDownloadDir)
+      .catch(() => {});
+  }, []);
+
+  const displayPath = appSettings.transfer.download_path || resolvedDownloadDir;
 
   // Filter transfers: show all if no active session, else show session-specific + active
   const visibleTransfers = activeSessionId
@@ -171,7 +184,7 @@ export default function FileTransfer({ activeSessionId }: FileTransferProps) {
     >
       <PanelHeader
         title={t("panel.fileTransfer")}
-        meta={visibleTransfers.length}
+        titleClassName="shrink-0 whitespace-nowrap"
         actions={
           <>
             {hasCompleted && (
@@ -213,6 +226,19 @@ export default function FileTransfer({ activeSessionId }: FileTransferProps) {
           </div>
         )}
       </div>
+
+      {displayPath && (
+        <div
+          className="shrink-0 border-t px-2 py-1.5 font-mono text-[0.75rem] leading-tight"
+          style={{
+            borderColor: "var(--df-border)",
+            color: "var(--df-text-dimmed)",
+          }}
+          title={displayPath}
+        >
+          <div className="truncate">{displayPath}</div>
+        </div>
+      )}
     </aside>
   );
 }

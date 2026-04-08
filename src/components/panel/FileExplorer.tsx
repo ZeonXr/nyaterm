@@ -1,8 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
-import { join, tempDir } from "@tauri-apps/api/path";
+import { downloadDir, join, tempDir } from "@tauri-apps/api/path";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { openPath as openUrl } from "@tauri-apps/plugin-opener";
+import { openPath } from "@tauri-apps/plugin-opener";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -41,6 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useApp } from "@/context/AppContext";
 import { formatSize } from "@/lib/utils";
 import { openAutoUpload } from "@/lib/windowManager";
 import type { FileEntry, FileExplorerProps } from "@/types/global";
@@ -82,6 +84,7 @@ function ToolbarDivider() {
 /** Remote file browser for active SSH session. Lists dirs/files, supports navigation. */
 export default function FileExplorer({ activeSessionId }: FileExplorerProps) {
   const { t } = useTranslation();
+  const { appSettings } = useApp();
 
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [currentPath, setCurrentPath] = useState("");
@@ -453,25 +456,32 @@ export default function FileExplorer({ activeSessionId }: FileExplorerProps) {
     });
   };
 
+  const resolveDownloadDir = async (): Promise<string> => {
+    const configured = appSettings.transfer.download_path;
+    if (configured) return configured;
+    return downloadDir();
+  };
+
   const downloadEntries = async (entries: FileEntry[]) => {
     if (!activeSessionId || entries.length === 0) return;
 
     try {
-      const shouldPickDirectory = entries.length > 1 || entries.some((entry) => entry.is_dir);
+      const askEach = appSettings.transfer.ask_save_location;
 
-      if (shouldPickDirectory) {
-        const localDir = await openDialog({ directory: true });
-        if (!localDir || typeof localDir !== "string") return;
-
+      if (askEach) {
         for (const entry of entries) {
-          const localPath = await join(localDir, entry.name);
           if (entry.is_dir) {
+            const localDir = await openDialog({ directory: true });
+            if (!localDir || typeof localDir !== "string") continue;
+            const localPath = await join(localDir, entry.name);
             await invoke("download_remote_directory", {
               sessionId: activeSessionId,
               remotePath: getEntryFullPath(entry),
               localPath,
             });
           } else {
+            const localPath = await saveDialog({ defaultPath: entry.name });
+            if (!localPath) continue;
             await invoke("download_remote_file", {
               sessionId: activeSessionId,
               remotePath: getEntryFullPath(entry),
@@ -482,14 +492,24 @@ export default function FileExplorer({ activeSessionId }: FileExplorerProps) {
         return;
       }
 
-      const [entry] = entries;
-      const localPath = await saveDialog({ defaultPath: entry.name });
-      if (!localPath) return;
-      await invoke("download_remote_file", {
-        sessionId: activeSessionId,
-        remotePath: getEntryFullPath(entry),
-        localPath,
-      });
+      const defaultDir = await resolveDownloadDir();
+
+      for (const entry of entries) {
+        const localPath = await join(defaultDir, entry.name);
+        if (entry.is_dir) {
+          await invoke("download_remote_directory", {
+            sessionId: activeSessionId,
+            remotePath: getEntryFullPath(entry),
+            localPath,
+          });
+        } else {
+          await invoke("download_remote_file", {
+            sessionId: activeSessionId,
+            remotePath: getEntryFullPath(entry),
+            localPath,
+          });
+        }
+      }
     } catch (e) {
       console.error("Download failed", e);
     }
@@ -566,10 +586,11 @@ export default function FileExplorer({ activeSessionId }: FileExplorerProps) {
 
   const handleOpenDefault = async (entry: FileEntry) => {
     if (!activeSessionId || entry.is_dir) return;
+    let localPath: string;
     try {
       const tDir = await tempDir();
       const downloadTimestamp = Date.now().toString();
-      const localPath = await join(
+      localPath = await join(
         tDir,
         "dragonfly",
         activeSessionId,
@@ -587,14 +608,13 @@ export default function FileExplorer({ activeSessionId }: FileExplorerProps) {
     }
 
     try {
-      // Start watching the file for auto-upload
       await invoke("start_file_watch", {
         sessionId: activeSessionId,
         localPath,
         remotePath: getEntryFullPath(entry),
       });
 
-      await openUrl(localPath);
+      await openPath(localPath, appSettings.transfer.default_editor || undefined);
     } catch (e) {
       toast.error(String(e));
     }

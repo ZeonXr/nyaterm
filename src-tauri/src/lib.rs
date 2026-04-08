@@ -9,6 +9,7 @@ mod error;
 mod fuzzy;
 mod import;
 mod pty;
+pub mod recording;
 mod session;
 mod sftp;
 mod ssh;
@@ -16,6 +17,7 @@ mod translate;
 mod tunnel;
 pub mod watcher;
 
+use recording::RecordingManager;
 use session::SessionManager;
 use std::sync::Arc;
 use tauri::Manager;
@@ -67,12 +69,14 @@ fn init_tracing(log_dir: std::path::PathBuf) {
 pub fn run() {
     let session_manager = Arc::new(SessionManager::new());
     let tunnel_manager = Arc::new(TunnelManager::new());
+    let recording_manager = Arc::new(RecordingManager::new());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(session_manager.clone())
         .manage(tunnel_manager.clone())
+        .manage(recording_manager.clone())
         .setup(move |app| {
             let home_dir = app
                 .path()
@@ -142,6 +146,9 @@ pub fn run() {
             commands::session_cmds::get_command_history,
             commands::session_cmds::fuzzy_search_history,
             commands::session_cmds::fuzzy_search_commands,
+            commands::session_cmds::start_recording,
+            commands::session_cmds::stop_recording,
+            commands::session_cmds::is_recording,
             commands::sftp_cmds::get_home_dir,
             commands::sftp_cmds::list_remote_dir,
             commands::sftp_cmds::delete_remote_file,

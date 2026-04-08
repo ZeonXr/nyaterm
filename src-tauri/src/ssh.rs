@@ -3,6 +3,7 @@
 //! Uses russh for connection/auth and emits terminal output via Tauri events.
 
 use crate::error::{AppError, AppResult};
+use crate::recording::RecordingManager;
 use crate::session::{
     SessionCommand, SessionHandle, SessionInfo, SessionManager, SessionType, SharedCwd,
 };
@@ -169,13 +170,9 @@ pub async fn connect_with_proxy(
                         )
                         .await
                     }
-                    _ => {
-                        tokio_socks::tcp::Socks5Stream::connect(proxy_addr.as_str(), target).await
-                    }
+                    _ => tokio_socks::tcp::Socks5Stream::connect(proxy_addr.as_str(), target).await,
                 }
-                .map_err(|e| {
-                    AppError::Auth(format!("SOCKS5 proxy connection failed: {}", e))
-                })?;
+                .map_err(|e| AppError::Auth(format!("SOCKS5 proxy connection failed: {}", e)))?;
                 client::connect_stream(ssh_config, stream.into_inner(), handler).await
             }
             "http" => {
@@ -194,12 +191,8 @@ pub async fn connect_with_proxy(
                         .await
                     }
                     _ => {
-                        async_http_proxy::http_connect_tokio(
-                            &mut stream,
-                            &config.host,
-                            config.port,
-                        )
-                        .await
+                        async_http_proxy::http_connect_tokio(&mut stream, &config.host, config.port)
+                            .await
                     }
                 }
                 .map_err(|e| AppError::Auth(format!("HTTP proxy tunnel failed: {}", e)))?;
@@ -292,8 +285,7 @@ pub async fn create_ssh_handle(
     if let Ok(app_settings) = crate::config::load_app_settings(app) {
         let interval = app_settings.terminal.keep_alive_interval;
         if interval > 0 {
-            client_cfg.keepalive_interval =
-                Some(std::time::Duration::from_secs(interval as u64));
+            client_cfg.keepalive_interval = Some(std::time::Duration::from_secs(interval as u64));
         }
     }
 
@@ -497,7 +489,17 @@ pub async fn create_ssh_session(
     let handle_for_io = handle_mtx.clone();
     let cid_for_io = connection_id.clone();
     tokio::spawn(async move {
-        ssh_io_loop(app, sid, mgr, channel, handle_for_io, cmd_rx, cwd, cid_for_io).await;
+        ssh_io_loop(
+            app,
+            sid,
+            mgr,
+            channel,
+            handle_for_io,
+            cmd_rx,
+            cwd,
+            cid_for_io,
+        )
+        .await;
     });
 
     tracing::info!(session_id = %session_id, "SSH session created");
@@ -520,6 +522,10 @@ async fn ssh_io_loop(
     let cwd_event = format!("cwd-changed-{}", session_id);
     let closed_event = format!("session-closed-{}", session_id);
 
+    let recording_mgr: Option<Arc<RecordingManager>> = app
+        .try_state::<Arc<RecordingManager>>()
+        .map(|s| s.inner().clone());
+
     let mut attached = false;
     let mut buffer: Vec<String> = Vec::new();
     let mut injecting = true;
@@ -538,6 +544,9 @@ async fn ssh_io_loop(
                         }
                     }
                     Some(SessionCommand::Write(data)) => {
+                        if let Some(ref rec) = recording_mgr {
+                            rec.write_input(&session_id, &data);
+                        }
                         let _ = channel.data(&data[..]).await;
                     }
                     Some(SessionCommand::Resize { cols, rows }) => {
@@ -572,6 +581,10 @@ async fn ssh_io_loop(
                             continue;
                         }
 
+                        if let Some(ref rec) = recording_mgr {
+                            rec.write_output(&session_id, &text);
+                        }
+
                         if let Some(path) = parse_osc7(&text) {
                             *cwd.lock().await = Some(path.clone());
                             let _ = app.emit(&cwd_event, &path);
@@ -584,6 +597,9 @@ async fn ssh_io_loop(
                     }
                     Some(ChannelMsg::ExtendedData { ref data, .. }) => {
                         let text = String::from_utf8_lossy(data).to_string();
+                        if let Some(ref rec) = recording_mgr {
+                            rec.write_output(&session_id, &text);
+                        }
                         if attached {
                             let _ = app.emit(&output_event, &text);
                         } else {
@@ -595,6 +611,10 @@ async fn ssh_io_loop(
                 }
             }
         }
+    }
+
+    if let Some(ref rec) = recording_mgr {
+        rec.cleanup_session(&session_id);
     }
 
     manager.remove_session(&session_id).await;
