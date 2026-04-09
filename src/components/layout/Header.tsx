@@ -40,7 +40,7 @@ import {
   increaseTerminalFontSize,
 } from "../../lib/terminalFontSize";
 import DragonflyLogo from "../DragonflyLogo";
-import ImportDialog from "../dialog/saved-connections/ImportDialog";
+import ImportDialog from "../dialog/connections/ImportDialog";
 import {
   AlertDialog,
   AlertDialogAction,
