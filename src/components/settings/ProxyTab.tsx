@@ -15,10 +15,7 @@ export function ProxyTab() {
 
   return (
     <div className="space-y-4">
-      <SettingRow
-        label={t("settings.enableProxy")}
-        desc={t("settings.enableProxyDesc")}
-      >
+      <SettingRow label={t("settings.enableProxy")} desc={t("settings.enableProxyDesc")}>
         <SettingSwitch
           checked={appSettings.proxy.enabled}
           onChange={(v) => updateAppSettings({ proxy: { ...appSettings.proxy, enabled: v } })}
@@ -37,8 +34,8 @@ export function ProxyTab() {
           <SelectItem value="http">HTTP</SelectItem>
         </SettingSelect>
 
-        <div className="flex gap-2">
-          <div className="flex-1">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="min-w-0 flex-1">
             <SettingInput
               label={t("settings.proxyHost")}
               placeholder="127.0.0.1"
@@ -48,7 +45,7 @@ export function ProxyTab() {
               }
             />
           </div>
-          <div className="w-32">
+          <div className="w-full sm:w-32">
             <SettingNumberInput
               label={t("settings.proxyPort")}
               min={1}

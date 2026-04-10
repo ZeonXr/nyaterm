@@ -1,13 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { SelectItem } from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
-import {
-  SettingInput,
-  SettingNumberInput,
-  SettingRow,
-  SettingSelect,
-  SettingSwitch,
-} from "./SettingFormItems";
+import { NumberInput } from "../ui/number-input";
+import { SettingInput, SettingRow, SettingSelect, SettingSwitch } from "./SettingFormItems";
 
 export function SecurityTab() {
   const { t } = useTranslation();
@@ -16,9 +11,7 @@ export function SecurityTab() {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h4 className="font-semibold text-sm">
-          {t("settings.sessionSecurity")}
-        </h4>
+        <h4 className="font-semibold text-sm">{t("settings.sessionSecurity")}</h4>
 
         <SettingRow
           label={t("settings.enableScreenLock")}
@@ -40,12 +33,11 @@ export function SecurityTab() {
               label={t("settings.idleLockMinutes")}
               desc={t("settings.idleLockMinutesDesc")}
             >
-              <div className="flex items-center gap-3">
-                <SettingNumberInput
-                  label=""
+              <div className="flex w-full items-center gap-3 sm:w-auto">
+                <NumberInput
                   min={0}
                   max={1440}
-                  className="w-28"
+                  className="w-full sm:w-28"
                   value={appSettings.security.idle_lock_minutes}
                   onChange={(v) =>
                     updateAppSettings({
@@ -53,7 +45,9 @@ export function SecurityTab() {
                     })
                   }
                 />
-                <span className="text-sm text-muted-foreground">{t("common.minutes")}</span>
+                <span className="shrink-0 text-sm text-muted-foreground">
+                  {t("common.minutes")}
+                </span>
               </div>
             </SettingRow>
 
@@ -90,15 +84,9 @@ export function SecurityTab() {
             updateAppSettings({ security: { ...appSettings.security, host_key_policy: v } })
           }
         >
-          <SelectItem value="strict">
-            {t("settings.hostKeyStrict")}
-          </SelectItem>
-          <SelectItem value="prompt">
-            {t("settings.hostKeyPrompt")}
-          </SelectItem>
-          <SelectItem value="accept">
-            {t("settings.hostKeyAccept")}
-          </SelectItem>
+          <SelectItem value="strict">{t("settings.hostKeyStrict")}</SelectItem>
+          <SelectItem value="prompt">{t("settings.hostKeyPrompt")}</SelectItem>
+          <SelectItem value="accept">{t("settings.hostKeyAccept")}</SelectItem>
         </SettingSelect>
       </div>
     </div>

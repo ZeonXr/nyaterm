@@ -4,6 +4,16 @@ import { NumberInput } from "@/components/ui/number-input";
 import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
+
+function SettingMeta({ label, desc }: { label: string; desc?: string }) {
+  return (
+    <div className="min-w-0">
+      <Label className="font-medium text-sm">{label}</Label>
+      {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
+    </div>
+  );
+}
+
 export function SettingRow({
   label,
   desc,
@@ -14,12 +24,11 @@ export function SettingRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="flex-1">
-        <Label className="font-medium text-sm">{label}</Label>
-        {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
+    <div className="grid gap-3 min-[560px]:grid-cols-[minmax(10rem,15rem)_minmax(0,1fr)] min-[560px]:items-start">
+      <SettingMeta label={label} desc={desc} />
+      <div className="flex min-w-0 max-w-full items-center gap-2 justify-self-end min-[560px]:justify-end min-[560px]:justify-self-stretch">
+        {children}
       </div>
-      {children}
     </div>
   );
 }
@@ -30,10 +39,11 @@ export function SettingInput({
   ...inputProps
 }: { label: string; desc?: string } & React.ComponentProps<typeof Input>) {
   return (
-    <div className="space-y-1">
-      <Label className="font-medium text-sm">{label}</Label>
-      {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
-      <Input className="text-sm" {...inputProps} />
+    <div className="grid gap-3 min-[560px]:grid-cols-[minmax(10rem,15rem)_minmax(0,1fr)] min-[560px]:items-start">
+      <SettingMeta label={label} desc={desc} />
+      <div className="min-w-0">
+        <Input className="w-full text-sm" {...inputProps} />
+      </div>
     </div>
   );
 }
@@ -58,17 +68,18 @@ export function SettingNumberInput({
   className?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <Label className="font-medium text-sm">{label}</Label>
-      {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
-      <NumberInput
-        value={value}
-        onChange={onChange}
-        min={min}
-        max={max}
-        step={step}
-        className={className}
-      />
+    <div className="grid gap-3 min-[560px]:grid-cols-[minmax(10rem,15rem)_minmax(0,1fr)] min-[560px]:items-start">
+      <SettingMeta label={label} desc={desc} />
+      <div className="min-w-0">
+        <NumberInput
+          value={value}
+          onChange={onChange}
+          min={min}
+          max={max}
+          step={step}
+          className={className}
+        />
+      </div>
     </div>
   );
 }
@@ -87,15 +98,16 @@ export function SettingSelect({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1">
-      <Label className="font-medium text-sm">{label}</Label>
-      {desc && <p className="text-xs text-muted-foreground pb-1">{desc}</p>}
-      <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger className="w-full text-sm">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>{children}</SelectContent>
-      </Select>
+    <div className="grid gap-3 min-[560px]:grid-cols-[minmax(10rem,15rem)_minmax(0,1fr)] min-[560px]:items-start">
+      <SettingMeta label={label} desc={desc} />
+      <div className="min-w-0">
+        <Select value={value} onValueChange={onValueChange}>
+          <SelectTrigger className="w-full text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>{children}</SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

@@ -75,19 +75,18 @@ export function AppearanceTab() {
       {/* Font Family */}
       <div className="space-y-2">
         <Label className="font-medium text-sm">{t("settings.fontFamily")}</Label>
-        <p className="text-xs text-muted-foreground">
-          {t("settings.fontFamilyDesc")}
-        </p>
+        <p className="text-xs text-muted-foreground">{t("settings.fontFamilyDesc")}</p>
         <div className="space-y-2">
           {appSettings.appearance.font_family
             .split(",")
             .map((f) => f.trim())
             .map((font, idx, arr) => (
-              <div key={idx} className="flex items-center gap-2">
-                <span className="text-xs w-20 shrink-0 text-muted-foreground">
-                  {idx === 0
-                    ? t("settings.fontPrimary")
-                    : `${t("settings.fontFallback")} ${idx}`}
+              <div
+                key={`${font}-${idx === 0 ? "primary" : `fallback-${idx}`}`}
+                className="flex flex-col gap-2 sm:flex-row sm:items-center"
+              >
+                <span className="text-xs text-muted-foreground sm:w-20 sm:shrink-0">
+                  {idx === 0 ? t("settings.fontPrimary") : `${t("settings.fontFallback")} ${idx}`}
                 </span>
                 <Select
                   value={applicationFonts.includes(font) ? font : ""}
@@ -102,7 +101,7 @@ export function AppearanceTab() {
                     });
                   }}
                 >
-                  <SelectTrigger className="flex-1 h-9 px-3 text-sm shadow-xs focus:ring-1 focus:ring-ring focus:outline-none">
+                  <SelectTrigger className="h-9 w-full flex-1 px-3 text-sm shadow-xs focus:ring-1 focus:ring-ring focus:outline-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper">
@@ -119,7 +118,7 @@ export function AppearanceTab() {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  className="text-destructive hover:bg-destructive/10"
+                  className="self-end text-destructive hover:bg-destructive/10 sm:self-auto"
                   title={t("common.remove")}
                   onClick={() => {
                     const newFonts = arr.filter((_, i) => i !== idx);
@@ -152,7 +151,7 @@ export function AppearanceTab() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <SettingNumberInput
           label={t("settings.fontSize")}
           min={MIN_TERMINAL_FONT_SIZE}
@@ -198,10 +197,7 @@ export function AppearanceTab() {
         />
       </SettingRow>
 
-      <SettingRow
-        label={t("settings.fontLigatures")}
-        desc={t("settings.fontLigaturesDesc")}
-      >
+      <SettingRow label={t("settings.fontLigatures")} desc={t("settings.fontLigaturesDesc")}>
         <SettingSwitch
           checked={appSettings.appearance.ligatures}
           onChange={(v) =>

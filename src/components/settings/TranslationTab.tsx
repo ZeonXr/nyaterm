@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
+import { MdCheck, MdClose } from "react-icons/md";
+import { Label } from "@/components/ui/label";
 import { SelectItem } from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
 import { SettingInput, SettingSelect } from "./SettingFormItems";
-import { Label } from "@/components/ui/label";
-import { MdCheck, MdClose } from "react-icons/md";
 
 const TARGET_LANGUAGES = [
   { value: "zh-CN", label: "中文 (简体)" },
@@ -77,14 +77,14 @@ export function TranslationTab() {
         <div className="space-y-4">
           {/* Free providers */}
           <div className="rounded-md border p-3 space-y-1">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm font-medium">{t("translation.google")}</span>
               <ProviderStatus configured free />
             </div>
           </div>
 
           <div className="rounded-md border p-3 space-y-1">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm font-medium">{t("translation.microsoft")}</span>
               <ProviderStatus configured free />
             </div>
@@ -92,7 +92,7 @@ export function TranslationTab() {
 
           {/* DeepL */}
           <div className="rounded-md border p-3 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm font-medium">{t("translation.deepl")}</span>
               <ProviderStatus configured={!!ts.deepl_api_key} />
             </div>
@@ -107,11 +107,11 @@ export function TranslationTab() {
 
           {/* Baidu */}
           <div className="rounded-md border p-3 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm font-medium">{t("translation.baidu")}</span>
               <ProviderStatus configured={!!(ts.baidu_app_id && ts.baidu_app_key)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <SettingInput
                 label={t("settings.appId")}
                 placeholder="App ID"
@@ -130,11 +130,11 @@ export function TranslationTab() {
 
           {/* Ali */}
           <div className="rounded-md border p-3 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm font-medium">{t("translation.ali")}</span>
               <ProviderStatus configured={!!(ts.ali_app_id && ts.ali_app_key)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <SettingInput
                 label={t("settings.appId")}
                 placeholder="Access Key ID"
@@ -153,11 +153,11 @@ export function TranslationTab() {
 
           {/* Youdao */}
           <div className="rounded-md border p-3 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm font-medium">{t("translation.youdao")}</span>
               <ProviderStatus configured={!!(ts.youdao_app_id && ts.youdao_app_key)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <SettingInput
                 label={t("settings.appId")}
                 placeholder="App ID"

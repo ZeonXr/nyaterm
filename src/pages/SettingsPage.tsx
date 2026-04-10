@@ -24,7 +24,6 @@ import { TranslationTab } from "@/components/settings/TranslationTab";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/context/AppContext";
 
-
 export default function SettingsPage() {
   const { t } = useTranslation();
   const { appSettings } = useApp();
@@ -83,7 +82,7 @@ export default function SettingsPage() {
 
   return (
     <div
-      className="h-screen flex flex-col overflow-hidden"
+      className="h-full min-h-0 flex flex-col overflow-hidden"
       style={{ fontFamily: appSettings.appearance.font_family }}
     >
       <ChildWindowHeader
@@ -92,43 +91,51 @@ export default function SettingsPage() {
         onClose={handleClose}
       />
 
-      <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Sidebar */}
-        <div className="w-full sm:w-52 shrink-0 flex flex-col border-r bg-background overflow-y-auto">
-          <div className="p-6 border-b shrink-0 flex items-center gap-3" data-tauri-drag-region>
-            <MdSettings className="text-2xl text-primary" />
-            <h1 className="text-xl font-semibold">{t("settings.title")}</h1>
+        <div className="flex w-14 shrink-0 flex-col border-r bg-background sm:w-44 lg:w-52">
+          <div
+            className="flex items-center justify-center gap-3 border-b px-3 py-4 sm:justify-start sm:px-4 sm:py-5"
+            data-tauri-drag-region
+          >
+            <MdSettings className="shrink-0 text-2xl text-primary" />
+            <h1 className="hidden text-lg font-semibold sm:block lg:text-xl">
+              {t("settings.title")}
+            </h1>
           </div>
-          <div className="flex-1 py-3 px-3 space-y-1">
-            {tabs.map((tab) => (
-              <Button
-                key={tab.id}
-                variant="ghost"
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center justify-start gap-3 px-3 py-2.5 h-auto rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id ? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
-              >
-                <DynamicIcon
-                  name={tab.icon}
-                  className={`text-[1.125rem] ${activeTab === tab.id ? "text-primary" : ""}`}
-                />
-                {tab.label}
-              </Button>
-            ))}
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-3">
+            <div className="flex flex-col gap-1">
+              {tabs.map((tab) => (
+                <Button
+                  key={tab.id}
+                  variant="ghost"
+                  onClick={() => setActiveTab(tab.id)}
+                  title={tab.label}
+                  className={`h-auto w-full justify-center gap-3 rounded-lg px-2 py-2.5 text-sm font-medium transition-colors sm:justify-start sm:px-3 ${activeTab === tab.id ? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}
+                >
+                  <DynamicIcon
+                    name={tab.icon}
+                    className={`shrink-0 text-[1.125rem] ${activeTab === tab.id ? "text-primary" : ""}`}
+                  />
+                  <span className="hidden truncate sm:inline">{tab.label}</span>
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 min-h-0 min-w-0 flex flex-col">
           <div
-            className="p-6 border-b shrink-0 flex items-center justify-between"
+            className="flex shrink-0 items-center justify-between border-b px-4 py-4 sm:px-6 sm:py-5"
             data-tauri-drag-region
           >
-            <h3 className="text-2xl font-semibold">
+            <h3 className="text-lg font-semibold sm:text-2xl">
               {tabs.find((t) => t.id === activeTab)?.label}
             </h3>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 md:p-8">
-            <div className="max-w-2xl text-base space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            <div className="max-w-3xl space-y-6 text-base">
               {ActiveComponent && <ActiveComponent />}
             </div>
           </div>

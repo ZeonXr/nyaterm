@@ -1,10 +1,10 @@
+import React from "react";
 import { useTranslation } from "react-i18next";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { SelectItem } from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
 import { MOD } from "@/hooks/useGlobalShortcuts";
 import { SettingInput, SettingRow, SettingSelect, SettingSwitch } from "./SettingFormItems";
-import { KbdGroup, Kbd } from "@/components/ui/kbd";
-import React from "react";
 
 export function InteractionTab() {
   const { t } = useTranslation();
@@ -57,10 +57,7 @@ export function InteractionTab() {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <SettingRow
-          label={t("settings.copyOnSelect")}
-          desc={t("settings.copyOnSelectDesc")}
-        >
+        <SettingRow label={t("settings.copyOnSelect")} desc={t("settings.copyOnSelectDesc")}>
           <SettingSwitch
             checked={appSettings.interaction.copy_on_select}
             onChange={(v) =>
@@ -69,14 +66,13 @@ export function InteractionTab() {
           />
         </SettingRow>
 
-        <SettingRow
-          label={t("settings.rightClickPaste")}
-          desc={t("settings.rightClickPasteDesc")}
-        >
+        <SettingRow label={t("settings.rightClickPaste")} desc={t("settings.rightClickPasteDesc")}>
           <SettingSwitch
             checked={appSettings.interaction.right_click_paste}
             onChange={(v) =>
-              updateAppSettings({ interaction: { ...appSettings.interaction, right_click_paste: v } })
+              updateAppSettings({
+                interaction: { ...appSettings.interaction, right_click_paste: v },
+              })
             }
           />
         </SettingRow>
@@ -110,13 +106,16 @@ export function InteractionTab() {
             <h3 className="text-sm font-medium">{section.title}</h3>
             {section.desc && <p className="text-xs text-muted-foreground">{section.desc}</p>}
           </div>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-2 mt-2">
+          <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-2 xl:gap-x-8">
             {section.items.map((item) => (
-              <div key={item.label} className="flex items-center justify-between py-1 px-1">
+              <div
+                key={item.label}
+                className="flex flex-col gap-2 rounded-md px-2 py-2 hover:bg-accent/30 sm:flex-row sm:items-center sm:justify-between"
+              >
                 <span className="text-sm text-muted-foreground">{item.label}</span>
-                <KbdGroup>
+                <KbdGroup className="flex-wrap sm:justify-end">
                   {item.keys.split("+").map((key, i, arr) => (
-                    <React.Fragment key={i}>
+                    <React.Fragment key={`${item.label}-${key.trim()}`}>
                       <Kbd>{key.trim()}</Kbd>
                       {i < arr.length - 1 && <span className="text-muted-foreground">+</span>}
                     </React.Fragment>
@@ -130,4 +129,3 @@ export function InteractionTab() {
     </div>
   );
 }
-

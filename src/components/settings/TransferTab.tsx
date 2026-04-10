@@ -46,12 +46,14 @@ function PathPickerInput({
   };
 
   return (
-    <div className="space-y-1">
-      <Label className="font-medium text-sm">{label}</Label>
-      {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
-      <div className="flex gap-2">
+    <div className="grid gap-3 min-[560px]:grid-cols-[minmax(10rem,15rem)_minmax(0,1fr)] min-[560px]:items-start">
+      <div className="min-w-0 space-y-1">
+        <Label className="font-medium text-sm">{label}</Label>
+        {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
+      </div>
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
         <Input
-          className="text-sm flex-1"
+          className="flex-1 text-sm"
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -59,7 +61,7 @@ function PathPickerInput({
         <Button
           variant="outline"
           size="sm"
-          className="shrink-0 gap-1.5"
+          className="w-full shrink-0 gap-1.5 sm:w-auto"
           onClick={handleBrowse}
         >
           <MdFolderOpen className="text-sm" />
@@ -77,7 +79,9 @@ export function TransferTab() {
   const [defaultDownloadDir, setDefaultDownloadDir] = useState("");
 
   useEffect(() => {
-    downloadDir().then(setDefaultDownloadDir).catch(() => {});
+    downloadDir()
+      .then(setDefaultDownloadDir)
+      .catch(() => {});
   }, []);
 
   const update = (patch: Partial<typeof transfer>) =>
@@ -93,10 +97,7 @@ export function TransferTab() {
         onChange={(v) => update({ download_path: v })}
       />
 
-      <SettingRow
-        label={t("settings.askSaveLocation")}
-        desc={t("settings.askSaveLocationDesc")}
-      >
+      <SettingRow label={t("settings.askSaveLocation")} desc={t("settings.askSaveLocationDesc")}>
         <SettingSwitch
           checked={transfer.ask_save_location}
           onChange={(v) => update({ ask_save_location: v })}
@@ -110,7 +111,9 @@ export function TransferTab() {
         placeholder={t("settings.defaultEditorDesc")}
         onChange={(v) => update({ default_editor: v })}
         directory={false}
-        filters={[{ name: "Executable", extensions: ["exe", "cmd", "bat", "com", "app", "sh", ""] }]}
+        filters={[
+          { name: "Executable", extensions: ["exe", "cmd", "bat", "com", "app", "sh", ""] },
+        ]}
       />
 
       <PathPickerInput
