@@ -13,11 +13,10 @@ interface ChildWindowOptions {
 }
 
 const MAIN_WINDOW_LABEL = "main";
-const MODAL_WINDOW_LABELS = new Set(["settings", "new-session", "quick-command"]);
 const AUTO_UPLOAD_WINDOW_PREFIX = "auto-upload-";
 
 export function isModalChildLabel(label: string) {
-  return MODAL_WINDOW_LABELS.has(label) || label.startsWith(AUTO_UPLOAD_WINDOW_PREFIX);
+  return label.startsWith(AUTO_UPLOAD_WINDOW_PREFIX);
 }
 
 async function getMainWindow() {
@@ -75,11 +74,12 @@ export async function bounceTopModalWindow() {
 }
 
 export async function openChildWindow(opts: ChildWindowOptions) {
+  const isModalChild = isModalChildLabel(opts.label);
   const existing = await WebviewWindow.getByLabel(opts.label);
   if (existing) {
     await existing.setTitle(opts.title).catch(() => {});
     await existing.show().catch(() => {});
-    await existing.setAlwaysOnTop(true).catch(() => {});
+    await existing.setAlwaysOnTop(isModalChild).catch(() => {});
     await existing.setFocus().catch(() => {});
     await syncMainWindowModalState().catch(() => {});
     return existing;
@@ -94,12 +94,12 @@ export async function openChildWindow(opts: ChildWindowOptions) {
     center: true,
     decorations: false,
     resizable: opts.resizable ?? true,
-    alwaysOnTop: isModalChildLabel(opts.label),
+    alwaysOnTop: isModalChild,
     parent: parentWindow,
   });
   win.once("tauri://created", () => {
     emit("child-window-opened", { label: opts.label });
-    void win.setAlwaysOnTop(true).catch(() => {});
+    void win.setAlwaysOnTop(isModalChild).catch(() => {});
     void win.setFocus().catch(() => {});
     void syncMainWindowModalState();
   });

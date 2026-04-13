@@ -64,6 +64,7 @@ import {
 } from "./lib/terminalFontSize";
 import {
   bounceTopModalWindow,
+  isModalChildLabel,
   openNewSession,
   openNewSessionWithTarget,
   openSettings,
@@ -187,8 +188,8 @@ function App() {
   // Unread output tracking: session IDs with unread terminal output
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(new Set());
 
-  // Child window modal overlay
-  const [childWindowCount, setChildWindowCount] = useState(0);
+  // Track only modal child windows that should block the main window.
+  const [modalChildWindowCount, setModalChildWindowCount] = useState(0);
 
   // OTP / 2FA dialog state
   const [otpRequest, setOtpRequest] = useState<OtpRequest | null>(null);
@@ -315,15 +316,17 @@ function App() {
     };
   }, [addTab, addPendingTab, updateTabSession, closeTab, updateAppSettings]);
 
-  // Track child window open/close for modal overlay
+  // Track modal child window open/close for overlay and focus enforcement.
   useEffect(() => {
     const unsubs = [
-      listen<{ label: string }>("child-window-opened", () => {
-        setChildWindowCount((c) => c + 1);
+      listen<{ label: string }>("child-window-opened", ({ payload }) => {
+        if (!isModalChildLabel(payload.label)) return;
+        setModalChildWindowCount((c) => c + 1);
         void syncMainWindowModalState();
       }),
-      listen<{ label: string }>("child-window-closed", () => {
-        setChildWindowCount((c) => Math.max(0, c - 1));
+      listen<{ label: string }>("child-window-closed", ({ payload }) => {
+        if (!isModalChildLabel(payload.label)) return;
+        setModalChildWindowCount((c) => Math.max(0, c - 1));
         void syncMainWindowModalState();
       }),
     ];
@@ -340,7 +343,7 @@ function App() {
     import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
       getCurrentWindow()
         .onFocusChanged(({ payload: focused }) => {
-          if (!focused || childWindowCount === 0) return;
+          if (!focused || modalChildWindowCount === 0) return;
           void syncMainWindowModalState();
           void bounceTopModalWindow();
         })
@@ -353,7 +356,7 @@ function App() {
     return () => {
       unlistenFocusChanged?.();
     };
-  }, [childWindowCount]);
+  }, [modalChildWindowCount]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
   const activePane = activeTab ? getActivePane(activeTab) : null;
@@ -767,6 +770,31 @@ function App() {
     [closePaneBackendSession, createSessionForPane, t, updatePaneSession],
   );
 
+  const handleReconnectSessionById = useCallback(
+    async (sessionId: string) => {
+      const tab = findTabBySessionId(tabs, sessionId);
+      const pane = tab ? findPaneBySessionId(tab, sessionId) : null;
+      if (!tab || !pane || pane.connecting || !canCreateSessionFromPane(pane)) return;
+
+      toast.info(t("tabCtx.reconnecting"));
+
+      try {
+        const closed = await closePaneBackendSession(pane);
+        if (!closed) {
+          throw new Error("close_session_failed");
+        }
+
+        const newSessionId = await createSessionForPane(pane);
+        updatePaneSession(tab.id, pane.id, newSessionId);
+        toast.success(t("tabCtx.reconnectSuccess"));
+      } catch (error) {
+        logger.error("Failed to reconnect session from active sessions panel", error);
+        toast.error(t("tabCtx.reconnectFailed"));
+      }
+    },
+    [closePaneBackendSession, createSessionForPane, t, tabs, updatePaneSession],
+  );
+
   const handleSplitSession = useCallback(
     async (tab: Tab, direction: PaneSplitDirection) => {
       const pane = getActivePane(tab);
@@ -832,6 +860,42 @@ function App() {
       await persistWorkspaceNow(t("tabCtx.closeFailed"));
     },
     [closePane, closePaneBackendSession, persistWorkspaceNow, t],
+  );
+
+  const handleDisconnectSessionById = useCallback(
+    async (sessionId: string) => {
+      const tab = findTabBySessionId(tabs, sessionId);
+      const pane = tab ? findPaneBySessionId(tab, sessionId) : null;
+
+      if (!tab || !pane) {
+        try {
+          await invoke("close_session", { sessionId });
+        } catch (error) {
+          logger.error("Failed to disconnect session outside workspace", error);
+          toast.error(t("tabCtx.closeFailed"));
+        }
+        return;
+      }
+
+      const closed = await closePaneBackendSession(pane);
+      if (!closed) {
+        toast.error(t("tabCtx.closeFailed"));
+        return;
+      }
+
+      closePane(tab.id, pane.id);
+      await persistWorkspaceNow(t("tabCtx.closeFailed"));
+    },
+    [closePane, closePaneBackendSession, persistWorkspaceNow, t, tabs],
+  );
+
+  const canReconnectSessionById = useCallback(
+    (sessionId: string) => {
+      const tab = findTabBySessionId(tabs, sessionId);
+      const pane = tab ? findPaneBySessionId(tab, sessionId) : null;
+      return !!pane && !pane.connecting && canCreateSessionFromPane(pane);
+    },
+    [tabs],
   );
 
   const handleCloseAllTabs = useCallback(async () => {
@@ -1279,7 +1343,14 @@ function App() {
           />
         );
       case "activeSessions":
-        return <ActiveSessions onSessionClick={handleSessionClick} />;
+        return (
+          <ActiveSessions
+            onSessionClick={handleSessionClick}
+            onSessionReconnect={handleReconnectSessionById}
+            onSessionDisconnect={handleDisconnectSessionById}
+            canReconnect={canReconnectSessionById}
+          />
+        );
       case "commandHistory":
         return <CommandHistory onCommandSend={handleHistoryCommand} />;
       case "resourceMonitor":
@@ -1394,13 +1465,13 @@ function App() {
                   </div>
                 </div>
               ) : terminalWindows ? (
-                  <TabWindowsWorkspace
-                    layout={terminalWindows}
-                    tabsById={tabsById}
-                    focusedTabId={activeTabId}
-                    unreadTabIds={unreadTabIds}
-                    onSelectTab={handleSelectLeafTab}
-                    onAddTab={handleAddTabFromLeaf}
+                <TabWindowsWorkspace
+                  layout={terminalWindows}
+                  tabsById={tabsById}
+                  focusedTabId={activeTabId}
+                  unreadTabIds={unreadTabIds}
+                  onSelectTab={handleSelectLeafTab}
+                  onAddTab={handleAddTabFromLeaf}
                   onTabClose={handleCloseWorkspaceTab}
                   onDuplicateSession={handleDuplicateSession}
                   onReconnectSession={handleReconnectSession}
@@ -1521,7 +1592,7 @@ function App() {
         <Toaster position="bottom-right" />
 
         {/* Child Window Modal Overlay */}
-        {childWindowCount > 0 && (
+        {modalChildWindowCount > 0 && (
           <div
             className="fixed inset-0 z-[9998]"
             style={{
