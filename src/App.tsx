@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import AboutDialog from "./components/dialog/app/AboutDialog";
 import LockScreen from "./components/dialog/app/LockScreen";
+import UpdateDialog from "./components/dialog/app/UpdateDialog";
 import { OtpDialog, type OtpRequest } from "./components/dialog/connections/OtpDialog";
 import type { ActivityBarItem } from "./components/layout/ActivityBar";
 import ActivityBar from "./components/layout/ActivityBar";
@@ -62,6 +63,7 @@ import {
   decreaseTerminalFontSize,
   increaseTerminalFontSize,
 } from "./lib/terminalFontSize";
+import { checkForUpdate, type UpdateInfo } from "./lib/updater";
 import {
   bounceTopModalWindow,
   isModalChildLabel,
@@ -187,6 +189,9 @@ function App() {
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false);
   const [mobileRightOpen, setMobileRightOpen] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [helpDotVisible, setHelpDotVisible] = useState(false);
   const lastCtrlWheelZoomAtRef = useRef(0);
 
   // Recording state: tracks which sessions are currently being recorded
@@ -206,6 +211,23 @@ function App() {
     appSettings.security.enable_screen_lock ? appSettings.security.idle_lock_minutes : 0,
     () => setIsLocked(true),
   );
+
+  // Background update check on startup
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      checkForUpdate()
+        .then((info) => {
+          if (info) {
+            setUpdateInfo(info);
+            setHelpDotVisible(true);
+          }
+        })
+        .catch((err) => {
+          console.warn("Update check failed:", err);
+        });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Cross-window event listeners
   useEffect(() => {
@@ -1421,6 +1443,10 @@ function App() {
           onToggleLeft={() => setMobileLeftOpen(!mobileLeftOpen)}
           onToggleRight={() => setMobileRightOpen(!mobileRightOpen)}
           onAbout={() => setShowAbout(true)}
+          onCheckForUpdates={() => setShowUpdateDialog(true)}
+          hasUpdate={updateInfo !== null}
+          showUpdateDot={helpDotVisible}
+          onHelpMenuOpen={() => setHelpDotVisible(false)}
           activeTab={activeTab}
           savedConnections={savedConnections}
         />
@@ -1636,6 +1662,12 @@ function App() {
         </main>
 
         <AboutDialog open={showAbout} onClose={() => setShowAbout(false)} />
+
+        <UpdateDialog
+          open={showUpdateDialog}
+          onClose={() => setShowUpdateDialog(false)}
+          onUpdateFound={(info) => setUpdateInfo(info)}
+        />
 
         <OtpDialog request={otpRequest} onDone={() => setOtpRequest(null)} />
 

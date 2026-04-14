@@ -20,6 +20,8 @@ pub fn run() {
     let pending_auth_manager = Arc::new(PendingAuthManager::new());
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(session_manager.clone())
