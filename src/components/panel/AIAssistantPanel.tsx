@@ -1,7 +1,7 @@
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LuMessageSquarePlus } from "react-icons/lu";
+import { LuMessageSquarePlus, LuQuote } from "react-icons/lu";
 import {
   MdAutoAwesome,
   MdBlock,
@@ -21,9 +21,16 @@ import {
   MdStop,
 } from "react-icons/md";
 import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 import PanelHeader from "@/components/layout/PanelHeader";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,6 +62,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useApp } from "@/context/AppContext";
+import { useTheme } from "@/context/ThemeContext";
 import type { AIErrorDetectedDetail, AIOpenIntent } from "@/lib/aiEvents";
 import { AI_ERROR_DETECTED_EVENT } from "@/lib/aiEvents";
 import {
@@ -69,6 +77,7 @@ import { buildAIContext, getTerminalContextProvider } from "@/lib/terminalContex
 import { openSettings } from "@/lib/windowManager";
 import { collectSessionPanes } from "@/lib/workspaceTabs";
 import type {
+  AgentStepPayload,
   AIAction,
   AICommandCard,
   AIContext,
@@ -183,8 +192,75 @@ function looksLikeStructuredJsonOutput(content: string) {
   );
 }
 
+interface QuotedText {
+  text: string;
+}
+
 function AnimatedStatusText({ label }: { label: string }) {
   return <span className="df-thinking-text font-medium">{label}</span>;
+}
+
+function buildPrismThemeFromColors(colors: import("@/lib/themes").ThemeColors): Record<string, CSSProperties> {
+  const t = colors.terminal;
+  return {
+    'code[class*="language-"]': {
+      color: t.foreground,
+      background: "none",
+      fontFamily: "inherit",
+      textAlign: "left",
+      whiteSpace: "pre",
+      wordSpacing: "normal",
+      wordBreak: "normal",
+      wordWrap: "normal",
+      lineHeight: "1.5",
+      tabSize: 4,
+    },
+    'pre[class*="language-"]': {
+      color: t.foreground,
+      background: "transparent",
+      fontFamily: "inherit",
+      textAlign: "left",
+      whiteSpace: "pre",
+      wordSpacing: "normal",
+      wordBreak: "normal",
+      wordWrap: "normal",
+      lineHeight: "1.5",
+      tabSize: 4,
+      overflow: "auto",
+    },
+    comment: { color: t.brightBlack, fontStyle: "italic" },
+    prolog: { color: t.brightBlack },
+    doctype: { color: t.brightBlack },
+    cdata: { color: t.brightBlack },
+    punctuation: { color: t.foreground },
+    property: { color: t.cyan },
+    tag: { color: t.red },
+    boolean: { color: t.magenta },
+    number: { color: t.magenta },
+    constant: { color: t.magenta },
+    symbol: { color: t.green },
+    deleted: { color: t.red },
+    selector: { color: t.green },
+    "attr-name": { color: t.yellow },
+    string: { color: t.green },
+    char: { color: t.green },
+    builtin: { color: t.cyan },
+    inserted: { color: t.green },
+    operator: { color: t.foreground },
+    entity: { color: t.yellow, cursor: "help" },
+    url: { color: t.cyan },
+    variable: { color: t.red },
+    atrule: { color: t.yellow },
+    "attr-value": { color: t.green },
+    function: { color: t.blue },
+    "class-name": { color: t.yellow },
+    keyword: { color: t.magenta },
+    regex: { color: t.cyan },
+    important: { color: t.yellow, fontWeight: "bold" },
+    bold: { fontWeight: "bold" },
+    italic: { fontStyle: "italic" },
+    namespace: { opacity: 0.7 },
+  };
 }
 
 function MarkdownContent({ content }: { content: string }) {
@@ -423,6 +499,139 @@ function AICommandCardView({
   );
 }
 
+function AgentStepView({ step, prismStyle }: { step: AgentStepPayload; prismStyle: Record<string, CSSProperties> }) {
+  const { t } = useTranslation();
+  const [thoughtOpen, setThoughtOpen] = useState(false);
+  const [outputOpen, setOutputOpen] = useState(false);
+
+  const isCommand = step.action.kind === "execute_command";
+  const isFinal = step.action.kind === "final_answer";
+
+  const isSuccess = step.status === "completed";
+  const isFailed = step.status === "failed" || step.status === "rejected";
+  const isRunning = step.status === "running";
+
+  const borderColor = isSuccess
+    ? "border-emerald-500"
+    : isFailed
+      ? "border-destructive"
+      : isRunning
+        ? "border-primary"
+        : "border-amber-500";
+
+  return (
+    <div className="pb-3 last:pb-0">
+      {/* Header: # N + collapsible thought */}
+      <Collapsible open={thoughtOpen} onOpenChange={setThoughtOpen}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center gap-1.5 text-[0.6875rem] text-muted-foreground hover:text-foreground"
+          >
+            <MdExpandMore
+              className={`text-sm transition-transform ${thoughtOpen ? "rotate-180" : ""}`}
+            />
+            <span className="font-semibold text-foreground">#{step.stepIndex + 1}</span>
+            <span>{step.thought ? t("ai.expandThought") : (isFinal ? t("ai.agentStepCompleted") : "")}</span>
+            {step.observation?.durationMs != null ? (
+              <span className="ml-auto tabular-nums text-muted-foreground/70">
+                {step.observation.durationMs}ms
+              </span>
+            ) : null}
+          </button>
+        </CollapsibleTrigger>
+        {step.thought ? (
+          <CollapsibleContent>
+            <div className="mt-1 ml-5 text-xs leading-5 text-muted-foreground">
+              {step.thought}
+            </div>
+          </CollapsibleContent>
+        ) : null}
+      </Collapsible>
+
+      {/* Command box with status-colored left border */}
+      {isCommand && step.action.command ? (
+        <div className={`mt-2 overflow-hidden rounded-md border-l-[3px] ${borderColor} border border-border/60 bg-muted/20`}>
+          {/* Shell header */}
+          <div className="flex items-center gap-1.5 border-b border-border/40 px-2.5 py-1 text-[0.625rem] text-muted-foreground">
+            <span className="font-medium uppercase tracking-wider">shell</span>
+            {step.action.riskLevel ? (
+              <span className={`ml-auto rounded-full border px-1.5 py-0.5 font-medium ${riskClassName[step.action.riskLevel]}`}>
+                {step.action.riskLevel}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Command body */}
+          <SyntaxHighlighter
+            language="bash"
+            style={prismStyle}
+            customStyle={{
+              margin: 0,
+              padding: "0.5rem 0.625rem",
+              fontSize: "0.6875rem",
+              lineHeight: "1.25rem",
+              background: "transparent",
+              borderRadius: 0,
+            }}
+            wrapLongLines
+          >
+            {step.action.command}
+          </SyntaxHighlighter>
+
+          {/* Collapsible output inside the box */}
+          {step.observation ? (
+            <Collapsible open={outputOpen} onOpenChange={setOutputOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-1.5 border-t border-border/40 px-2.5 py-1 text-[0.625rem] text-muted-foreground hover:bg-muted/30"
+                >
+                  <MdExpandMore
+                    className={`text-sm transition-transform ${outputOpen ? "rotate-180" : ""}`}
+                  />
+                  <span>{outputOpen ? t("ai.collapseOutput") : t("ai.expandOutput")}</span>
+                  {step.observation.exitCode != null ? (
+                    <span
+                      className={`ml-auto font-medium ${step.observation.exitCode === 0 ? "text-emerald-600" : "text-destructive"}`}
+                    >
+                      {t("ai.stepExitCode", { code: step.observation.exitCode })}
+                    </span>
+                  ) : null}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <pre className="max-h-48 overflow-auto border-t border-border/40 bg-muted/10 px-2.5 py-2 font-mono text-[0.625rem] leading-5 terminal-scroll whitespace-pre-wrap break-all text-muted-foreground">
+                  {step.observation.output || "(no output)"}
+                </pre>
+              </CollapsibleContent>
+            </Collapsible>
+          ) : null}
+
+          {/* Running indicator inside box */}
+          {isRunning ? (
+            <div className="border-t border-border/40 px-2.5 py-1.5">
+              <AnimatedStatusText label={t("ai.agentExecuting")} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Error message */}
+      {step.error ? (
+        <div className="mt-1.5 ml-5 text-[0.6875rem] text-destructive">{step.error}</div>
+      ) : null}
+
+      {/* Final answer */}
+      {isFinal && step.action.answer ? (
+        <div className="mt-2 ml-5">
+          <MarkdownContent content={step.action.answer} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ModelCombobox({
   models,
   credentials,
@@ -494,8 +703,10 @@ function ModelCombobox({
 function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantPanelProps) {
   const { t } = useTranslation();
   const { appSettings, updateAppSettings, tabs, savedConnections } = useApp();
+  const { theme } = useTheme();
   const aiSettings = appSettings.ai;
   const [input, setInput] = useState("");
+  const [quotedText, setQuotedText] = useState<QuotedText | null>(null);
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [sessions, setSessions] = useState<AISession[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -514,6 +725,7 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
   const [commandExecution, setCommandExecution] = useState<Record<string, AICommandExecutionState>>(
     {},
   );
+  const [agentSteps, setAgentSteps] = useState<AgentStepPayload[]>([]);
   const [modelPopoverOpen, setModelPopoverOpen] = useState(false);
   const handledIntentIdRef = useRef<string | null>(null);
   const historyButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -527,6 +739,7 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
 
   const enabledModels = useMemo(() => getEnabledAIModels(aiSettings), [aiSettings]);
   const selectedModel = useMemo(() => selectDefaultAIModel(aiSettings), [aiSettings]);
+  const prismStyle = useMemo(() => buildPrismThemeFromColors(theme.colors), [theme.colors]);
   const mode = aiSettings.default_mode ?? "ask";
 
   const allSessionPanes = useMemo(() => {
@@ -607,14 +820,14 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
     shouldAutoScrollRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when chat messages change.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll when chat messages or agent steps change.
   useEffect(() => {
     if (!shouldAutoScrollRef.current) return;
     requestAnimationFrame(() => {
       const el = scrollContainerRef.current;
       if (el) el.scrollTop = el.scrollHeight;
     });
-  }, [messages]);
+  }, [messages, agentSteps]);
 
   const loadSessions = useCallback(async () => {
     try {
@@ -812,6 +1025,7 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
       setLoading(true);
       cancelledRef.current = false;
       cleanupStreamListener();
+      if (requestMode === "agent") setAgentSteps([]);
 
       const userMessage = createLocalMessage("user", userInput, currentSessionId ?? "local");
       const assistantId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -823,7 +1037,7 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
           id: assistantId,
           sessionId: currentSessionId ?? "local",
           role: "assistant",
-          content: "",
+          content: requestMode === "agent" ? "" : "",
           createdAt: new Date().toISOString(),
           reasoningContent: null,
           commandCards: [],
@@ -832,11 +1046,27 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
       setStreamingAssistantId(assistantId);
 
       try {
-        const unlisten = await listen<AIStreamEventPayload>(
+        const unlisten = await listen<AIStreamEventPayload | AgentStepPayload>(
           `ai-stream-${requestStreamId}`,
           (event) => {
-            const payload = event.payload;
-            if (payload.streamId !== requestStreamId) return;
+            const raw = event.payload as unknown as Record<string, unknown>;
+            if (raw.streamId !== requestStreamId) return;
+
+            if ("stepIndex" in raw) {
+              const step = raw as unknown as AgentStepPayload;
+              setAgentSteps((prev) => {
+                const existing = prev.findIndex((s) => s.stepIndex === step.stepIndex);
+                if (existing >= 0) {
+                  const next = [...prev];
+                  next[existing] = step;
+                  return next;
+                }
+                return [...prev, step];
+              });
+              return;
+            }
+
+            const payload = raw as unknown as AIStreamEventPayload;
 
             if (payload.type === "start") {
               if (payload.sessionId) setCurrentSessionId(payload.sessionId);
@@ -878,11 +1108,13 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
                   message.id === assistantId && payload.message ? payload.message : message,
                 ),
               );
-              handleAgentCommandCards(
-                payload.message?.commandCards ?? payload.commandCards ?? [],
-                requestMode,
-                allowedRisk,
-              );
+              if (requestMode !== "agent") {
+                handleAgentCommandCards(
+                  payload.message?.commandCards ?? payload.commandCards ?? [],
+                  requestMode,
+                  allowedRisk,
+                );
+              }
               void loadSessions();
               return;
             }
@@ -922,6 +1154,7 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
             streamId: requestStreamId,
             sessionId: currentSessionId,
             connectionId: primaryConn?.id ?? null,
+            terminalSessionId: panes[0]?.sessionId ?? null,
             action,
             userInput,
             mode: requestMode,
@@ -929,7 +1162,7 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
             modelName: requestModel.name,
             context,
             options: {
-              maxOutputCommands: 5,
+              maxOutputCommands: 2,
               language: "zh-CN",
               safetyMode: "strict",
               allowedCommandRiskLevel: allowedRisk,
@@ -984,10 +1217,12 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
   const submit = useCallback(() => {
     const value = input.trim();
     if (!value || loading) return;
+    const fullInput = quotedText ? `> ${quotedText.text}\n\n${value}` : value;
     setInput("");
+    setQuotedText(null);
     shouldAutoScrollRef.current = true;
-    void startChat("generate_command", value);
-  }, [input, loading, startChat]);
+    void startChat("generate_command", fullInput);
+  }, [input, loading, quotedText, startChat]);
 
   const cancelStream = useCallback(() => {
     if (!streamId) return;
@@ -1108,12 +1343,30 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
     setMessages([]);
     setCurrentSessionId(null);
     setInput("");
+    setQuotedText(null);
     setDetectedError(null);
     setTargetPanes([]);
     setCommandExecution({});
+    setAgentSteps([]);
     setShowMentionPopover(false);
     shouldAutoScrollRef.current = true;
   }, [loading]);
+
+  const handleCopySelection = useCallback(() => {
+    const sel = window.getSelection()?.toString();
+    if (sel) {
+      void navigator.clipboard.writeText(sel);
+      toast.success(t("ai.copied"));
+    }
+  }, [t]);
+
+  const handleQuoteSelection = useCallback(() => {
+    const sel = window.getSelection()?.toString()?.trim();
+    if (sel) {
+      setQuotedText({ text: sel });
+      textareaRef.current?.focus();
+    }
+  }, []);
 
   const handleInputChange = useCallback(
     (event: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -1290,64 +1543,88 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
         </div>
       ) : null}
 
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleMessagesScroll}
-        className="flex-1 overflow-auto p-3 terminal-scroll"
-      >
-        {messages.length === 0 ? (
-          <div className="flex h-full min-h-[12rem] flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground">
-            <MdAutoAwesome className="text-3xl" />
-            <div>{aiSettings.enabled ? t("ai.empty") : t("ai.goToSettingsToEnable")}</div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`rounded-md border p-3 text-xs leading-5 ${
-                  message.role === "user"
-                    ? "border-primary/25 bg-primary/10"
-                    : "border-border/70 bg-muted/20"
-                }`}
-              >
-                <div className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                  {message.role === "user" ? "User" : "AI"}
-                </div>
-                {message.role === "assistant" ? (
-                  <AssistantReasoning
-                    message={message}
-                    loading={loading && streamingAssistantId === message.id}
-                  />
-                ) : null}
-                {message.role === "assistant" ? (
-                  <AssistantResponse
-                    message={message}
-                    loading={loading && streamingAssistantId === message.id}
-                  />
-                ) : (
-                  <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                )}
-                {message.commandCards?.length ? (
-                  <div className="mt-3 space-y-2">
-                    {message.commandCards.map((card) => (
-                      <AICommandCardView
-                        key={card.id}
-                        card={card}
-                        execution={commandExecution[card.id]}
-                        onInsert={insertCommand}
-                        onSave={(item) => void saveQuickCommand(item)}
-                        onAuthorize={authorizeCommand}
-                        onReject={rejectCommand}
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            ref={scrollContainerRef}
+            onScroll={handleMessagesScroll}
+            className="flex-1 select-text overflow-auto p-3 terminal-scroll"
+          >
+            {messages.length === 0 ? (
+              <div className="flex h-full min-h-[12rem] flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground">
+                <MdAutoAwesome className="text-3xl" />
+                <div>{aiSettings.enabled ? t("ai.empty") : t("ai.goToSettingsToEnable")}</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`rounded-md border p-3 text-xs leading-5 ${
+                      message.role === "user"
+                        ? "border-primary/25 bg-primary/10"
+                        : "border-border/70 bg-muted/20"
+                    }`}
+                  >
+                    <div className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      {message.role === "user" ? "User" : "AI"}
+                    </div>
+                    {message.role === "assistant" ? (
+                      <AssistantReasoning
+                        message={message}
+                        loading={loading && streamingAssistantId === message.id}
                       />
+                    ) : null}
+                    {message.role === "assistant" ? (
+                      <AssistantResponse
+                        message={message}
+                        loading={loading && streamingAssistantId === message.id}
+                      />
+                    ) : (
+                      <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                    )}
+                    {message.commandCards?.length ? (
+                      <div className="mt-3 space-y-2">
+                        {message.commandCards.map((card) => (
+                          <AICommandCardView
+                            key={card.id}
+                            card={card}
+                            execution={commandExecution[card.id]}
+                            onInsert={insertCommand}
+                            onSave={(item) => void saveQuickCommand(item)}
+                            onAuthorize={authorizeCommand}
+                            onReject={rejectCommand}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+                {agentSteps.length > 0 ? (
+                  <div className="rounded-md border border-border/70 bg-muted/20 p-3 text-xs leading-5">
+                    <div className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      Agent
+                    </div>
+                    {agentSteps.map((step) => (
+                      <AgentStepView key={step.stepIndex} step={step} prismStyle={prismStyle} />
                     ))}
                   </div>
                 ) : null}
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={handleCopySelection}>
+            <MdContentCopy className="mr-2" />
+            {t("ai.copy")}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={handleQuoteSelection}>
+            <LuQuote className="mr-2" />
+            {t("ai.quote")}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
 
       <div className="shrink-0 border-t border-border/70 p-2">
         {targetPanes.length > 0 ? (
@@ -1414,6 +1691,22 @@ function AIAssistantPanel({ activePane, activeConnection, intent }: AIAssistantP
             </div>
           ) : null}
           <div className="space-y-2">
+            {quotedText ? (
+              <div className="flex items-center gap-1.5 rounded-md border border-primary/25 bg-primary/6">
+                <div className="w-[3px] self-stretch shrink-0 rounded-l-md bg-primary/60" />
+                <LuQuote className="shrink-0 text-[0.625rem] text-primary/70" />
+                <span className="min-w-0 flex-1 truncate py-1.5 text-[0.6875rem] text-muted-foreground">
+                  {quotedText.text}
+                </span>
+                <button
+                  type="button"
+                  className="mr-1.5 shrink-0 rounded p-0.5 text-muted-foreground/70 hover:text-foreground"
+                  onClick={() => setQuotedText(null)}
+                >
+                  <MdClose className="text-xs" />
+                </button>
+              </div>
+            ) : null}
             <Textarea
               ref={textareaRef}
               value={input}
