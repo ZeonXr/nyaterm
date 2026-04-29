@@ -546,6 +546,8 @@ export interface AISettings {
   terminal_ai_actions: AICustomActionConfig[];
   file_ai_actions: AICustomActionConfig[];
   max_ai_file_size_bytes: number;
+  max_agent_steps?: number | null;
+  agent_step_timeout_ms?: number | null;
 }
 
 export interface AIContext {
@@ -624,6 +626,33 @@ export interface AIStreamEventPayload {
   commandCards?: AICommandCard[];
   usage?: unknown;
   error?: string;
+}
+
+export type AgentActionKind = "execute_command" | "final_answer";
+export type AgentStepStatus = "running" | "completed" | "needs_approval" | "rejected" | "failed";
+
+export interface AgentStepAction {
+  kind: AgentActionKind;
+  command?: string | null;
+  riskLevel?: RiskLevel | null;
+  answer?: string | null;
+}
+
+export interface CommandObservation {
+  output: string;
+  exitCode?: number | null;
+  durationMs: number;
+}
+
+export interface AgentStepPayload {
+  streamId: string;
+  sessionId?: string;
+  stepIndex: number;
+  thought: string;
+  action: AgentStepAction;
+  observation?: CommandObservation | null;
+  status: AgentStepStatus;
+  error?: string | null;
 }
 
 export interface CommandRiskResponse {

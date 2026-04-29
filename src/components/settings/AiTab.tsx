@@ -136,6 +136,28 @@ export function AiGeneralTab() {
           />
         </SettingFieldGrid>
       </SettingSection>
+
+      <SettingSection title={t("ai.agentSettings")}>
+        <SettingFieldGrid>
+          <SettingNumberInput
+            label={t("ai.agentMaxSteps")}
+            min={1}
+            max={50}
+            step={1}
+            value={ai.max_agent_steps ?? 10}
+            onChange={(max_agent_steps) => update({ max_agent_steps })}
+          />
+          <SettingNumberInput
+            label={t("ai.agentStepTimeout")}
+            min={5000}
+            max={120000}
+            step={1000}
+            value={ai.agent_step_timeout_ms ?? 30000}
+            onChange={(agent_step_timeout_ms) => update({ agent_step_timeout_ms })}
+          />
+        </SettingFieldGrid>
+        <div className="text-xs text-muted-foreground">{t("ai.agentMaxStepsDesc")}</div>
+      </SettingSection>
     </div>
   );
 }
@@ -160,9 +182,10 @@ function groupModels(
   }
   return Array.from(groups.entries()).map(([groupKey, items]) => {
     const cred = credentialMap.get(groupKey);
-    const label = cred && !isBuiltinProvider(cred.id)
-      ? (cred.name || "Custom Provider")
-      : getProviderLabel(groupKey);
+    const label =
+      cred && !isBuiltinProvider(cred.id)
+        ? cred.name || "Custom Provider"
+        : getProviderLabel(groupKey);
     return { groupKey, label, models: items };
   });
 }

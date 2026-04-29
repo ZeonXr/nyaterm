@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { FiBook } from "react-icons/fi";
 import {
   MdAutoAwesome,
   MdBackup,
@@ -25,7 +26,6 @@ import {
   MdTranslate,
 } from "react-icons/md";
 import { TbCubeSpark } from "react-icons/tb";
-import { FiBook } from "react-icons/fi";
 import { toast } from "sonner";
 import ChildWindowHeader from "@/components/layout/ChildWindowHeader";
 import { AiGeneralTab, AiModelsTab, AiRulesTab } from "@/components/settings/AiTab";
