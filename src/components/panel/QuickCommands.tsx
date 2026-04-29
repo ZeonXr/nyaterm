@@ -331,6 +331,7 @@ function QuickCommands({ onSend, onSendToAll }: QuickCommandsProps) {
                 <MdFilterList className="pointer-events-none absolute left-2 top-1/2 z-10 -translate-y-1/2 text-[0.875rem]" />
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger
+                    size="sm"
                     className={`${headerControlClassName} w-full pl-7 pr-2 hover:bg-[color-mix(in_srgb,var(--df-bg-hover)_70%,var(--df-bg-panel))] focus:ring-1 focus:ring-[var(--df-primary)] [&_span]:leading-none`}
                   >
                     <SelectValue placeholder={t("quickCommands.allCategories")} />
