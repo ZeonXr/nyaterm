@@ -35,7 +35,7 @@ async fn detect_shell_type(handle: &mut client::Handle<SshHandler>) -> Option<Sh
         }
 
         let kind = ShellKind::from_name(output.trim());
-        if kind == ShellKind::Unknown || kind == ShellKind::PowerShell {
+        if kind == ShellKind::Unknown {
             None
         } else {
             Some(kind)

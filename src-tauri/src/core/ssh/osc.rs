@@ -11,7 +11,6 @@ pub enum ShellKind {
     Bash,
     Zsh,
     Fish,
-    PowerShell,
     PosixSh,
     Unknown,
 }
@@ -26,8 +25,6 @@ impl ShellKind {
             Self::Zsh
         } else if s.contains("bash") {
             Self::Bash
-        } else if s.contains("powershell") || s.contains("pwsh") {
-            Self::PowerShell
         } else if s.contains("sh") {
             Self::PosixSh
         } else {
@@ -136,32 +133,6 @@ pub fn injection_script(shell: ShellKind, ready_marker: &str) -> Option<String> 
                 " printf '{}' 2>/dev/null\n",
             ),
             ready_osc,
-        )),
-
-        ShellKind::PowerShell => Some(format!(
-            concat!(
-                " if (-not $env:DFLY_INJ) {{ $env:DFLY_INJ='1';",
-                " $dfEsc = [char]27; $dfBel = [char]7;",
-                " $global:DFLYLastHistoryId = 0;",
-                " try {{ $dfHist = Get-History -Count 1 -ErrorAction Stop; if ($dfHist) {{ $global:DFLYLastHistoryId = $dfHist.Id; }} }} catch {{}};",
-                " function prompt {{",
-                " try {{ $dfHist = Get-History -Count 1 -ErrorAction Stop; if ($dfHist -and $dfHist.Id -ne $global:DFLYLastHistoryId) {{",
-                " $global:DFLYLastHistoryId = $dfHist.Id;",
-                " $dfBytes = [System.Text.Encoding]::UTF8.GetBytes($dfHist.CommandLine);",
-                " $dfB64 = [Convert]::ToBase64String($dfBytes);",
-                " Write-Host -NoNewline \"$dfEsc]7777;DflyCommand:$dfB64$dfBel\";",
-                " }} }} catch {{}};",
-                " $p = (pwd).ProviderPath;",
-                " $h = [System.Net.Dns]::GetHostName();",
-                " Write-Host -NoNewline \"$dfEsc]7;file://$h$p$dfBel\";",
-                " return \"PS $p> \" }} }};",
-                " Write-Host -NoNewline \"$dfEsc]7777;DflyReady:{}$dfBel\"\n",
-            ),
-            // Embed the raw session id into the ready marker body.
-            ready_marker
-                .trim_start_matches('\x1b')
-                .trim_start_matches("]7777;DflyReady:")
-                .trim_end_matches('\x07'),
         )),
 
         ShellKind::PosixSh | ShellKind::Unknown => None,
