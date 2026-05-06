@@ -1,6 +1,6 @@
 [package]
 name = "nyaterm"
-version = "0.9.0"
+version = "1.0.0"
 description = "A Tauri App"
 authors = ["Kang"]
 edition = "2021"
