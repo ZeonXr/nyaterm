@@ -22,12 +22,11 @@ export default function AutoUploadPage() {
 
   const handleClose = () => getCurrentWindow().close();
 
-  const handleUpload = async (always: boolean) => {
+  const handleUpload = (always: boolean) => {
     if (!data) return;
 
-    // We emit an event to the main window to update its 'alwaysUploadFilesRef'
     if (always) {
-      await emit("auto-upload-decision", {
+      emit("auto-upload-decision", {
         sessionId: data.sessionId,
         localPath: data.localPath,
         remotePath: data.remotePath,
@@ -35,13 +34,11 @@ export default function AutoUploadPage() {
       });
     }
 
-    try {
-      await invoke("upload_local_file", {
-        sessionId: data.sessionId,
-        localPath: data.localPath,
-        remotePath: data.remotePath,
-      });
-    } catch (e) {
+    invoke("upload_local_file", {
+      sessionId: data.sessionId,
+      localPath: data.localPath,
+      remotePath: data.remotePath,
+    }).catch((e) => {
       logger.error({
         domain: "transfer.lifecycle",
         event: "upload.auto_upload_failed",
@@ -49,7 +46,7 @@ export default function AutoUploadPage() {
         ids: { session_id: data.sessionId },
         error: e,
       });
-    }
+    });
 
     handleClose();
   };
