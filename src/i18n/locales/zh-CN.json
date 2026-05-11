@@ -1245,6 +1245,7 @@
     "allSessions": "所有会话(A)",
     "click": "单击",
     "connectionFailed": "连接失败",
+    "hiddenSessions": "被隐藏的会话",
     "largeOutputProtectionActive": "大流量输出保护已启用",
     "largeOutputProtectionActiveDetail": "终端正在优先保证响应性，已跳过 {{skipped}} 个排队字符。",
     "largeOutputProtectionRecovered": "大流量输出保护已恢复正常",
@@ -1260,7 +1261,8 @@
     "reconnectFailed": "重新连接失败",
     "reconnecting": "正在重新连接...",
     "sessionDisconnected": "会话已断开",
-    "shellSessions": "Shell会话"
+    "shellSessions": "Shell会话",
+    "showHiddenSessions": "显示被隐藏的会话"
   },
   "terminalCtx": {
     "clearAll": "全部清除",

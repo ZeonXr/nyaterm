@@ -1245,6 +1245,7 @@
     "allSessions": "All Sessions (A)",
     "click": "Click",
     "connectionFailed": "Connection failed",
+    "hiddenSessions": "Hidden Sessions",
     "largeOutputProtectionActive": "Large-output protection is active",
     "largeOutputProtectionActiveDetail": "Rendering is prioritizing responsiveness. Skipped {{skipped}} queued characters.",
     "largeOutputProtectionRecovered": "Large-output protection recovered",
@@ -1260,7 +1261,8 @@
     "reconnectFailed": "Reconnect failed",
     "reconnecting": "Reconnecting...",
     "sessionDisconnected": "Session disconnected",
-    "shellSessions": "Shell Sessions"
+    "shellSessions": "Shell Sessions",
+    "showHiddenSessions": "Show Hidden Sessions"
   },
   "terminalCtx": {
     "clearAll": "Clear All",
