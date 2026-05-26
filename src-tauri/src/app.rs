@@ -2,6 +2,7 @@ use std::sync::Arc;
 use tauri::Manager;
 
 use crate::core::{CloudSyncManager, QuickCommandsStore, SessionManager};
+use crate::runtime::AppRuntime;
 
 fn create_main_window(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     if app.get_webview_window("main").is_some() {
@@ -19,7 +20,14 @@ fn create_main_window(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Er
             std::io::Error::new(std::io::ErrorKind::NotFound, "main window config not found")
         })?;
 
-    let _ = tauri::WebviewWindowBuilder::from_config(app, &main_window_config)?.build()?;
+    let mut builder = tauri::WebviewWindowBuilder::from_config(app, &main_window_config)?;
+    if let Some(runtime) = app.try_state::<AppRuntime>() {
+        if runtime.portable() {
+            builder = builder.data_directory(runtime.webview_data_dir().to_path_buf());
+        }
+    }
+
+    let _ = builder.build()?;
 
     Ok(())
 }
@@ -29,21 +37,20 @@ pub fn setup(
     session_manager: Arc<SessionManager>,
     quick_commands_store: Arc<QuickCommandsStore>,
     cloud_sync_manager: Arc<CloudSyncManager>,
+    runtime: AppRuntime,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let home_dir = app
-        .path()
-        .home_dir()
-        .map_err(|e: tauri::Error| e.to_string())?;
-    let config_dir = home_dir.join(".nyaterm");
-    crate::storage::init(&config_dir)?;
+    runtime.ensure_directories()?;
+    let portable_key_path = runtime.portable_key_path().map(ToOwned::to_owned);
+    crate::utils::crypto::set_portable_key_path(portable_key_path);
+    crate::storage::init(runtime.config_dir())?;
+    app.manage(runtime.clone());
 
     let settings_load = crate::config::load_app_settings(app.handle());
     let diagnostics = settings_load
         .as_ref()
         .map(|settings| settings.diagnostics.clone())
         .unwrap_or_default();
-    let log_dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
-    crate::observability::init_tracing(log_dir, &diagnostics);
+    crate::observability::init_tracing(runtime.log_dir().to_path_buf(), &diagnostics);
 
     if let Err(error) = settings_load {
         crate::observability::log_event(crate::observability::StructuredLog {

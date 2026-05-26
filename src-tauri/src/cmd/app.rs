@@ -2,6 +2,8 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use base64::Engine;
+use serde::Deserialize;
+use tauri::Manager;
 
 use crate::error::{AppError, AppResult};
 
@@ -10,6 +12,18 @@ use crate::error::{AppError, AppResult};
 pub struct LocalDropPathEntry {
     path: String,
     is_dir: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChildWindowOptions {
+    label: String,
+    title: String,
+    url: String,
+    width: Option<f64>,
+    height: Option<f64>,
+    resizable: Option<bool>,
+    always_on_top: Option<bool>,
 }
 
 #[tauri::command]
@@ -33,6 +47,73 @@ pub fn open_download_dir(app: tauri::AppHandle) -> AppResult<()> {
     }
 
     open_folder(&path)
+}
+
+#[tauri::command]
+pub fn open_log_dir(app: tauri::AppHandle) -> AppResult<()> {
+    let path = crate::runtime::log_dir(&app)?;
+    if !path.exists() {
+        std::fs::create_dir_all(&path)?;
+    }
+    open_folder(&path)
+}
+
+#[tauri::command]
+pub fn get_app_runtime_info(
+    state: tauri::State<'_, crate::runtime::AppRuntime>,
+) -> crate::runtime::AppRuntimeInfo {
+    state.info()
+}
+
+#[tauri::command]
+pub async fn open_child_window(
+    app: tauri::AppHandle,
+    options: ChildWindowOptions,
+) -> AppResult<()> {
+    if app.get_webview_window(&options.label).is_some() {
+        return Ok(());
+    }
+
+    let mut builder = tauri::WebviewWindowBuilder::new(
+        &app,
+        options.label,
+        tauri::WebviewUrl::App(options.url.into()),
+    )
+    .title(options.title)
+    .inner_size(
+        options.width.unwrap_or(720.0),
+        options.height.unwrap_or(560.0),
+    )
+    .visible(false)
+    .center()
+    .decorations(cfg!(target_os = "macos"))
+    .resizable(options.resizable.unwrap_or(true))
+    .always_on_top(options.always_on_top.unwrap_or(false));
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder
+            .title_bar_style(tauri::TitleBarStyle::Overlay)
+            .hidden_title(true);
+    }
+
+    if let Some(parent) = app.get_webview_window("main") {
+        builder = builder
+            .parent(&parent)
+            .map_err(|error| AppError::Config(error.to_string()))?;
+    }
+
+    if let Some(runtime) = app.try_state::<crate::runtime::AppRuntime>() {
+        if runtime.portable() {
+            builder = builder.data_directory(runtime.webview_data_dir().to_path_buf());
+        }
+    }
+
+    builder
+        .build()
+        .map_err(|error| AppError::Config(error.to_string()))?;
+
+    Ok(())
 }
 
 #[tauri::command]

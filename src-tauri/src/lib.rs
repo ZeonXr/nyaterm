@@ -7,6 +7,7 @@ mod core;
 mod error;
 mod observability;
 mod platform;
+mod runtime;
 mod storage;
 mod tray;
 mod utils;
@@ -19,6 +20,9 @@ use crate::core::{CloudSyncManager, QuickCommandsStore, RecordingManager, Sessio
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let runtime = runtime::resolve().expect("failed to resolve runtime paths");
+    runtime::prepare_webview_environment(&runtime);
+
     let session_manager = Arc::new(SessionManager::new());
     let tunnel_manager = Arc::new(TunnelManager::new());
     let recording_manager = Arc::new(RecordingManager::new());
@@ -33,9 +37,18 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
         app::show_main_window(app);
     }));
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let builder = if runtime.portable() {
+        builder
+    } else {
+        builder.plugin(tauri_plugin_updater::Builder::new().build())
+    };
+
+    let runtime_for_setup = runtime.clone();
+    let mut context = tauri::generate_context!();
+    runtime::apply_to_context(&mut context, &runtime);
 
     builder
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -47,11 +60,22 @@ pub fn run() {
         .manage(quick_commands_store.clone())
         .manage(cloud_sync_manager.clone())
         .manage(agent_approval_manager.clone())
-        .setup(move |a| app::setup(a, session_manager, quick_commands_store, cloud_sync_manager))
+        .setup(move |a| {
+            app::setup(
+                a,
+                session_manager,
+                quick_commands_store,
+                cloud_sync_manager,
+                runtime_for_setup.clone(),
+            )
+        })
         .on_window_event(app::on_window_event)
         .invoke_handler(tauri::generate_handler![
             cmd::app::quit_application,
             cmd::app::open_download_dir,
+            cmd::app::open_log_dir,
+            cmd::app::get_app_runtime_info,
+            cmd::app::open_child_window,
             cmd::app::open_transfer_target_directory,
             cmd::app::resolve_local_drop_paths,
             cmd::app::read_background_image_data_url,
@@ -172,6 +196,6 @@ pub fn run() {
             cmd::otp::generate_otp_code,
             cmd::otp::import_otp_from_qr,
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }

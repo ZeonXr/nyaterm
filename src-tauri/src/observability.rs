@@ -6,7 +6,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
@@ -259,10 +259,7 @@ pub fn export_diagnostics(
     output_path: &str,
 ) -> AppResult<()> {
     let settings = config::load_app_settings(app).unwrap_or_default();
-    let log_dir = app
-        .path()
-        .app_log_dir()
-        .map_err(|e| AppError::Config(e.to_string()))?;
+    let log_dir = crate::runtime::log_dir(app)?;
     let log_files = collect_log_files(
         &log_dir,
         normalize_retention_days(settings.diagnostics.retention_days),

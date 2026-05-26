@@ -9,7 +9,8 @@
 //! ```
 //!
 //! When a master password is configured the wrapping key is derived from it;
-//! otherwise the user's home directory path is used as the key material.
+//! otherwise installed mode uses the user's home directory path as the key
+//! material, while portable mode uses `data/config/portable.key`.
 //!
 //! The master password itself is stored in the settings document encrypted with the
 //! home-path-derived key (via [`encrypt_settings_secret`]) to avoid a circular
@@ -21,18 +22,26 @@ use aes_gcm::{AeadCore, Aes256Gcm, Key, KeyInit};
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use sha2::{Digest, Sha256};
+use std::path::PathBuf;
 use std::sync::RwLock;
 
 const WRAPPING_KEY_PREFIX: &[u8] = b"nyaterm-key-wrap-v1:";
 const LEGACY_WRAPPING_KEY_PREFIX: &[u8] = b"dragonfly-key-wrap-v1:";
 
 static MASTER_PASSWORD: RwLock<Option<String>> = RwLock::new(None);
+static PORTABLE_KEY_PATH: RwLock<Option<PathBuf>> = RwLock::new(None);
 
 /// Set the master password used for wrapping key derivation.
 /// Pass `None` to revert to home-path-based derivation.
 pub fn set_master_password(password: Option<String>) {
     let mut pw = MASTER_PASSWORD.write().unwrap();
     *pw = password.filter(|s| !s.is_empty());
+}
+
+/// Set the portable-mode key path used when no master password is configured.
+pub fn set_portable_key_path(path: Option<PathBuf>) {
+    let mut portable_key_path = PORTABLE_KEY_PATH.write().unwrap();
+    *portable_key_path = path;
 }
 
 /// Returns the currently configured master password, if any.
@@ -43,7 +52,7 @@ pub fn get_master_password() -> Option<String> {
 /// Derives a wrapping key from the given material.
 ///
 /// When `password` is `Some`, uses the password as key material.
-/// Otherwise falls back to the home directory path.
+/// Otherwise falls back to the runtime key material.
 fn derive_wrapping_key_with_prefix(
     prefix: &[u8],
     password: Option<&str>,
@@ -52,14 +61,45 @@ fn derive_wrapping_key_with_prefix(
     h.update(prefix);
     match password {
         Some(pw) => h.update(pw.as_bytes()),
-        None => {
-            let home = dirs::home_dir()
-                .ok_or_else(|| AppError::Crypto("cannot determine home directory".into()))?;
-            h.update(home.to_string_lossy().as_bytes());
-        }
+        None => h.update(fallback_key_material()?.as_slice()),
     }
     let digest = h.finalize();
     Ok(*Key::<Aes256Gcm>::from_slice(&digest))
+}
+
+fn fallback_key_material() -> AppResult<Vec<u8>> {
+    if let Some(path) = PORTABLE_KEY_PATH.read().unwrap().clone() {
+        return read_or_create_portable_key_material(path);
+    }
+
+    let home = dirs::home_dir()
+        .ok_or_else(|| AppError::Crypto("cannot determine home directory".into()))?;
+    Ok(home.to_string_lossy().as_bytes().to_vec())
+}
+
+fn read_or_create_portable_key_material(path: PathBuf) -> AppResult<Vec<u8>> {
+    if path.exists() {
+        let material = std::fs::read_to_string(&path)?;
+        let material = material.trim();
+        if material.is_empty() {
+            return Err(AppError::Crypto(format!(
+                "portable key file is empty: {}",
+                path.display()
+            )));
+        }
+        return Ok(material.as_bytes().to_vec());
+    }
+
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    use aes_gcm::aead::rand_core::RngCore as _;
+    let mut bytes = [0u8; 32];
+    OsRng.fill_bytes(&mut bytes);
+    let material = B64.encode(bytes);
+    std::fs::write(&path, format!("{material}\n"))?;
+    Ok(material.into_bytes())
 }
 
 fn derive_wrapping_key(password: Option<&str>) -> AppResult<Key<Aes256Gcm>> {

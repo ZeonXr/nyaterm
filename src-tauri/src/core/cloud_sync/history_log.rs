@@ -2,14 +2,12 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use serde_json::Value;
-use tauri::Manager;
-
 use crate::config::{self, CloudSyncHistoryEntry};
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::observability::{
     self, StructuredLog, StructuredLogLevel, LOG_FILE_PREFIX, LOG_FILE_SUFFIX,
 };
+use serde_json::Value;
 
 const HISTORY_LIMIT: usize = 200;
 pub(super) const HISTORY_LOG_DOMAIN: &str = "cloud_sync.history";
@@ -51,10 +49,7 @@ pub(super) fn read_cloud_sync_history_from_logs(
     let retention_days = config::load_app_settings(app)
         .map(|settings| settings.diagnostics.retention_days)
         .unwrap_or(7);
-    let log_dir = app
-        .path()
-        .app_log_dir()
-        .map_err(|error: tauri::Error| AppError::Config(error.to_string()))?;
+    let log_dir = crate::runtime::log_dir(app)?;
     let mut entries = Vec::new();
 
     for path in collect_cloud_sync_log_files(&log_dir, retention_days)? {
