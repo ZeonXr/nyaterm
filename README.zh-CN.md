@@ -290,6 +290,13 @@ pnpm tauri dev
 
 ---
 
+<a name="鸣谢"></a>
+# 鸣谢
+感谢以下项目和库使 NyaTerm 成为可能：
+- [WindTerm](https://github.com/kingToolbox/WindTerm) - 启发了 NyaTerm 的设计和功能
+- [tabby](https://github.com/Eugeny/tabby) - 一个优秀的跨平台终端，提供了很多设计灵感
+- [xterm.js](https://xtermjs.org/) - 强大的前端终端模拟器，提供了丰富的终端功能和扩展性
+
 <a name="许可证"></a>
 # 许可证
 

@@ -289,6 +289,13 @@ pnpm tauri dev
 
 ---
 
+<a name="credits"></a>
+# Credits
+Thanks to the following projects and libraries that make NyaTerm possible:
+- [WindTerm](https://github.com/kingToolbox/WindTerm) - Inspired the design and features of NyaTerm
+- [tabby](https://github.com/Eugeny/tabby) - An excellent cross-platform terminal that provided many design inspirations
+- [xterm.js](https://xtermjs.org/) - A powerful frontend terminal emulator that provides rich terminal functionality and extensibility
+
 <a name="license"></a>
 # License
 
