@@ -24,7 +24,6 @@ pub struct ChildWindowOptions {
     height: Option<f64>,
     resizable: Option<bool>,
     always_on_top: Option<bool>,
-    background_color: Option<String>,
 }
 
 #[tauri::command]
@@ -90,14 +89,6 @@ pub async fn open_child_window(
     .decorations(cfg!(target_os = "macos"))
     .resizable(options.resizable.unwrap_or(true))
     .always_on_top(options.always_on_top.unwrap_or(false));
-
-    if let Some(color) = options
-        .background_color
-        .as_deref()
-        .and_then(|value| value.parse::<tauri::webview::Color>().ok())
-    {
-        builder = builder.background_color(color);
-    }
 
     #[cfg(target_os = "macos")]
     {

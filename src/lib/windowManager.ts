@@ -1,4 +1,4 @@
-import { emit, listen } from "@tauri-apps/api/event";
+import { emit } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
   getCurrentWindow,
@@ -21,15 +21,7 @@ interface ChildWindowOptions {
 const MAIN_WINDOW_LABEL = "main";
 const AUTO_UPLOAD_WINDOW_PREFIX = "auto-upload-";
 const MODAL_CHILD_LABELS = new Set(["settings", "new-session", "quick-command"]);
-const CHILD_WINDOW_READY_TIMEOUT_MS = 10000;
-const readyChildWindowLabels = new Set<string>();
 const registeredDestroyedHandlers = new Set<string>();
-
-void listen<{ label: string }>("child-window-ready", ({ payload }) => {
-  if (isModalChildLabel(payload.label)) {
-    readyChildWindowLabels.add(payload.label);
-  }
-});
 
 export function isModalChildLabel(label: string) {
   return MODAL_CHILD_LABELS.has(label) || label.startsWith(AUTO_UPLOAD_WINDOW_PREFIX);
@@ -37,10 +29,6 @@ export function isModalChildLabel(label: string) {
 
 function needsAlwaysOnTop(label: string) {
   return label.startsWith(AUTO_UPLOAD_WINDOW_PREFIX);
-}
-
-function getChildWindowBackgroundColor() {
-  return getComputedStyle(document.documentElement).getPropertyValue("--df-bg").trim() || "#0d1117";
 }
 
 async function getMainWindow() {
@@ -107,53 +95,9 @@ function attachChildWindowDestroyedHandler(label: string, win: WebviewWindow) {
 
   win.once("tauri://destroyed", () => {
     registeredDestroyedHandlers.delete(label);
-    readyChildWindowLabels.delete(label);
     emit("child-window-closed", { label });
     void prepareForModalChildClose(label);
   });
-}
-
-function waitForChildWindowReady(label: string) {
-  if (readyChildWindowLabels.has(label)) return Promise.resolve(true);
-
-  return new Promise<boolean>((resolve) => {
-    let settled = false;
-    let unlistenReady: (() => void) | undefined;
-    const timeout = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      unlistenReady?.();
-      resolve(false);
-    }, CHILD_WINDOW_READY_TIMEOUT_MS);
-
-    listen<{ label: string }>("child-window-ready", ({ payload }) => {
-      if (payload.label !== label || settled) return;
-
-      settled = true;
-      window.clearTimeout(timeout);
-      unlistenReady?.();
-      resolve(true);
-    }).then((unlisten) => {
-      if (settled) {
-        unlisten();
-        return;
-      }
-      unlistenReady = unlisten;
-    });
-  });
-}
-
-async function revealChildWindow(win: WebviewWindow, label: string) {
-  const isReady = await waitForChildWindowReady(label);
-  if (!isReady) {
-    await win.close().catch(() => {});
-    return;
-  }
-
-  await win.show().catch(() => {});
-  await win.setFocus().catch(() => {});
-  emit("child-window-opened", { label });
-  await syncMainWindowModalState().catch(() => {});
 }
 
 export async function syncMainWindowModalState() {
@@ -182,17 +126,13 @@ export async function openChildWindow(opts: ChildWindowOptions) {
   if (existing) {
     await existing.setTitle(opts.title).catch(() => {});
     await existing.setAlwaysOnTop(needsAlwaysOnTop(opts.label)).catch(() => {});
-    const isVisible = await existing.isVisible().catch(() => true);
-    if (isVisible) {
-      await existing.show().catch(() => {});
-      await existing.setFocus().catch(() => {});
-      emit("child-window-opened", { label: opts.label });
-      await syncMainWindowModalState().catch(() => {});
-    } else {
-      await revealChildWindow(existing, opts.label);
-    }
+    await existing.show().catch(() => {});
+    await existing.setFocus().catch(() => {});
+    emit("child-window-opened", { label: opts.label });
+    await syncMainWindowModalState().catch(() => {});
     return existing;
   }
+
   await invoke("open_child_window", {
     options: {
       label: opts.label,
@@ -202,7 +142,6 @@ export async function openChildWindow(opts: ChildWindowOptions) {
       height: opts.height ?? 560,
       resizable: opts.resizable ?? true,
       alwaysOnTop: needsAlwaysOnTop(opts.label),
-      backgroundColor: getChildWindowBackgroundColor(),
     },
   });
 
@@ -213,17 +152,10 @@ export async function openChildWindow(opts: ChildWindowOptions) {
 
   await win.setAlwaysOnTop(needsAlwaysOnTop(opts.label)).catch(() => {});
   attachChildWindowDestroyedHandler(opts.label, win);
-
-  const readyTimeout = window.setTimeout(async () => {
-    const isVisible = await win.isVisible().catch(() => true);
-    if (isVisible) return;
-
-    await win.close().catch(() => {});
-  }, CHILD_WINDOW_READY_TIMEOUT_MS);
-
-  win.once("tauri://destroyed", () => {
-    window.clearTimeout(readyTimeout);
-  });
+  await win.show().catch(() => {});
+  await win.setFocus().catch(() => {});
+  emit("child-window-opened", { label: opts.label });
+  await syncMainWindowModalState().catch(() => {});
   return win;
 }
 
@@ -242,36 +174,6 @@ export async function openSettings(tab?: string) {
     emit("settings-open-tab", { tab });
   }
   return win;
-}
-
-export async function prewarmSettingsWindow() {
-  if (await WebviewWindow.getByLabel("settings")) return;
-
-  await invoke("open_child_window", {
-    options: {
-      label: "settings",
-      title: i18n.t("settings.title"),
-      url: "index.html?window=settings&prewarm=1",
-      width: 800,
-      height: 560,
-      resizable: true,
-      alwaysOnTop: false,
-      backgroundColor: getChildWindowBackgroundColor(),
-    },
-  });
-
-  const win = await WebviewWindow.getByLabel("settings");
-  if (!win) return;
-
-  attachChildWindowDestroyedHandler("settings", win);
-
-  window.setTimeout(async () => {
-    const isReady = readyChildWindowLabels.has("settings");
-    const isVisible = await win.isVisible().catch(() => true);
-    if (!isReady && !isVisible) {
-      await win.close().catch(() => {});
-    }
-  }, CHILD_WINDOW_READY_TIMEOUT_MS);
 }
 
 export interface NewSessionTarget {

@@ -27,7 +27,6 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
 export const THEME_CACHE_KEY = "df-theme-id";
-export const THEME_BACKGROUND_CACHE_KEY = "df-theme-background";
 
 /** Inject all theme colors as CSS custom properties on :root */
 export function applyThemeToDOM(colors: ThemeColors) {
@@ -54,9 +53,6 @@ export function applyThemeToDOM(colors: ThemeColors) {
   root.setProperty("--df-shadow", colors.shadow);
   root.setProperty("--df-scroll-thumb", colors.scrollThumb);
   root.setProperty("--df-accent", colors.accent);
-  try {
-    localStorage.setItem(THEME_BACKGROUND_CACHE_KEY, colors.bg);
-  } catch {}
 }
 
 /** Provides theme, themeName, setTheme. Syncs with appSettings.appearance.theme from backend. */

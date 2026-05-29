@@ -24,7 +24,6 @@ import {
   NON_PANEL_IDS,
   type TrayAction,
 } from "./lib/appWorkspace";
-import { preloadModalChildWindowPages } from "./lib/childWindowPreload";
 import { getErrorMessage, shouldPromptConnectionEditOnFailure } from "./lib/errors";
 import { invoke } from "./lib/invoke";
 import { logger } from "./lib/logger";
@@ -55,7 +54,6 @@ import {
   openNewSession,
   openNewSessionWithTarget,
   openSettings,
-  prewarmSettingsWindow,
 } from "./lib/windowManager";
 import {
   collectSessionPanes,
@@ -142,32 +140,6 @@ function App() {
     import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
       getCurrentWindow().show();
     });
-  }, [settingsLoaded]);
-
-  useEffect(() => {
-    if (!settingsLoaded) return;
-
-    const scheduleIdle =
-      window.requestIdleCallback ??
-      ((callback: IdleRequestCallback) =>
-        window.setTimeout(
-          () =>
-            callback({
-              didTimeout: false,
-              timeRemaining: () => 0,
-            }),
-          800,
-        ));
-
-    const cancelIdle = window.cancelIdleCallback ?? window.clearTimeout;
-    const idleId = scheduleIdle(() => {
-      preloadModalChildWindowPages();
-      void prewarmSettingsWindow();
-    });
-
-    return () => {
-      cancelIdle(idleId);
-    };
   }, [settingsLoaded]);
 
   useEffect(() => {
