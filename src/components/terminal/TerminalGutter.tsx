@@ -23,6 +23,7 @@ interface GutterLayout {
   topPadding: number;
   fontFamily: string;
   fontSize: number;
+  cellWidth: number;
 }
 
 function formatTimestamp(ms: number): string {
@@ -31,6 +32,21 @@ function formatTimestamp(ms: number): string {
   const mm = String(d.getMinutes()).padStart(2, "0");
   const ss = String(d.getSeconds()).padStart(2, "0");
   return `[${hh}:${mm}:${ss}]`;
+}
+
+interface XTermCoreWithRenderDimensions {
+  _core?: {
+    _renderService?: {
+      dimensions?: {
+        css?: {
+          cell?: {
+            height?: number;
+            width?: number;
+          };
+        };
+      };
+    };
+  };
 }
 
 export default function TerminalGutter({
@@ -50,6 +66,7 @@ export default function TerminalGutter({
     topPadding: 0,
     fontFamily: "inherit",
     fontSize: 12,
+    cellWidth: 8,
   });
 
   const computeLines = useCallback(() => {
@@ -65,7 +82,17 @@ export default function TerminalGutter({
     const screenHeight = viewport?.clientHeight ?? screen?.clientHeight ?? el.clientHeight;
     const topPadding = screen?.offsetTop ?? 0;
 
-    const rowHeight = terminal.rows > 0 ? screenHeight / terminal.rows : 18;
+    const core = (terminal as Terminal & XTermCoreWithRenderDimensions)._core;
+    const measuredCell = core?._renderService?.dimensions?.css?.cell;
+    const rowHeight =
+      measuredCell?.height && measuredCell.height > 0
+        ? measuredCell.height
+        : terminal.rows > 0
+          ? screenHeight / terminal.rows
+          : 18;
+    const fontSize = Number(terminal.options.fontSize ?? 12);
+    const cellWidth =
+      measuredCell?.width && measuredCell.width > 0 ? measuredCell.width : fontSize * 0.62;
     const viewportY = Math.max(0, Math.min(buf.baseY, viewportYRef.current || buf.viewportY));
     const rows = terminal.rows;
     const cursorAbsoluteY = buf.baseY + buf.cursorY;
@@ -106,7 +133,8 @@ export default function TerminalGutter({
       rowHeight,
       topPadding,
       fontFamily: String(terminal.options.fontFamily ?? "inherit"),
-      fontSize: Number(terminal.options.fontSize ?? 12),
+      fontSize,
+      cellWidth,
     });
   }, [suspended, terminalRef, lineTimestamps, showLineNumbers, showTimestamps]);
 
@@ -189,7 +217,7 @@ export default function TerminalGutter({
   useEffect(() => {
     if (suspended) return;
     scheduleUpdate();
-  }, [showLineNumbers, showTimestamps, scheduleUpdate, suspended]);
+  }, [scheduleUpdate, suspended]);
 
   if (suspended || (!showLineNumbers && !showTimestamps)) {
     return null;
@@ -200,16 +228,21 @@ export default function TerminalGutter({
     return Number.isFinite(value) ? Math.max(max, value) : max;
   }, 1);
   const lineNumWidth = showLineNumbers
-    ? Math.max(40, String(maxVisibleLineNumber).length * 8 + 12)
+    ? Math.max(Math.ceil(layout.cellWidth * String(maxVisibleLineNumber).length) + 2, 24)
     : 0;
-  const tsWidth = showTimestamps ? 88 : 0;
-  const gutterWidth = tsWidth + lineNumWidth;
+  const tsWidth = showTimestamps ? Math.ceil(layout.cellWidth * "[00:00:00]".length) + 2 : 0;
+  const columnGap = showLineNumbers && showTimestamps ? 8 : 0;
+  const innerRightPadding = 8;
+  const separatorGap = 10;
+  const gutterWidth = tsWidth + lineNumWidth + columnGap + innerRightPadding;
 
   return (
     <div
       className="nyaterm-wallpaper-transparent-surface shrink-0 select-none overflow-hidden border-r"
       style={{
+        boxSizing: "content-box",
         width: gutterWidth,
+        marginRight: separatorGap,
         paddingTop: layout.topPadding,
         borderColor: "var(--df-border)",
         backgroundColor: "var(--df-bg-terminal)",
@@ -220,16 +253,17 @@ export default function TerminalGutter({
       {layout.lines.map((line) => (
         <div
           key={line.key}
-          className="flex items-center whitespace-nowrap pr-1.5 text-right tabular-nums"
+          className="flex items-center justify-end whitespace-nowrap text-right tabular-nums"
           style={{
             height: layout.rowHeight,
             lineHeight: `${layout.rowHeight}px`,
-            fontSize: "0.75em",
+            columnGap,
+            paddingRight: innerRightPadding,
           }}
         >
           {showTimestamps && (
             <span
-              className="inline-block truncate pr-2 text-right"
+              className="inline-block text-right"
               style={{
                 width: tsWidth,
                 color: "var(--df-text-muted)",
@@ -242,7 +276,7 @@ export default function TerminalGutter({
 
           {showLineNumbers && (
             <span
-              className="inline-block truncate pr-1 text-right"
+              className="inline-block text-right"
               style={{
                 width: lineNumWidth,
                 color: "var(--df-text-dimmed)",
