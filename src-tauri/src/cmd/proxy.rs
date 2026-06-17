@@ -102,16 +102,8 @@ pub fn delete_proxy_group(app: tauri::AppHandle, group_id: String) -> AppResult<
     config::save_proxy_groups(&app, &groups)?;
 
     let mut proxies = config::load_proxies(&app)?;
-    let mut changed = false;
-    for proxy in &mut proxies {
-        if proxy.group_id.as_deref() == Some(group_id.as_str()) {
-            proxy.group_id = None;
-            changed = true;
-        }
-    }
-    if changed {
-        config::save_proxies(&app, &proxies)?;
-    }
+    proxies.retain(|proxy| proxy.group_id.as_deref() != Some(group_id.as_str()));
+    config::save_proxies(&app, &proxies)?;
 
     schedule_cloud_sync_notify(app.clone());
     Ok(())

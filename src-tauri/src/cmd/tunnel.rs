@@ -99,22 +99,23 @@ pub async fn delete_tunnel(
 }
 
 #[tauri::command]
-pub fn delete_tunnel_group(app: tauri::AppHandle, group_id: String) -> AppResult<()> {
+pub async fn delete_tunnel_group(
+    app: tauri::AppHandle,
+    tunnel_mgr: tauri::State<'_, Arc<TunnelManager>>,
+    group_id: String,
+) -> AppResult<()> {
     let mut groups = config::load_tunnel_groups(&app)?;
     groups.retain(|group| group.id != group_id);
     config::save_tunnel_groups(&app, &groups)?;
 
     let mut tunnels = config::load_tunnels(&app)?;
-    let mut changed = false;
-    for tunnel in &mut tunnels {
+    for tunnel in &tunnels {
         if tunnel.group_id.as_deref() == Some(group_id.as_str()) {
-            tunnel.group_id = None;
-            changed = true;
+            tunnel_mgr.close(&tunnel.id).await;
         }
     }
-    if changed {
-        config::save_tunnels(&app, &tunnels)?;
-    }
+    tunnels.retain(|tunnel| tunnel.group_id.as_deref() != Some(group_id.as_str()));
+    config::save_tunnels(&app, &tunnels)?;
 
     schedule_cloud_sync_notify(app.clone());
     Ok(())

@@ -478,7 +478,7 @@ export default function NetworkPanel() {
   const { t } = useTranslation();
   const { savedConnections, savedGroups } = useApp();
   const [activeTab, setActiveTab] = useState<NetworkTab>("tunnel");
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
   const [proxies, setProxies] = useState<ProxyConfig[]>([]);
   const [proxyGroups, setProxyGroups] = useState<NetworkGroup[]>([]);
@@ -538,7 +538,7 @@ export default function NetworkPanel() {
   );
 
   const toggleSection = useCallback((id: string) => {
-    setCollapsedSections((prev) => {
+    setExpandedSections((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -810,7 +810,7 @@ export default function NetworkPanel() {
                     <NetworkGroupSection
                       key={section.id}
                       section={section}
-                      collapsed={collapsedSections.has(`tunnel:${section.id}`)}
+                      collapsed={!expandedSections.has(`tunnel:${section.id}`)}
                       onToggle={() => toggleSection(`tunnel:${section.id}`)}
                       onRename={(group) => setGroupDialog({ tab: "tunnel", group })}
                       onDelete={(group, itemCount) =>
@@ -883,7 +883,7 @@ export default function NetworkPanel() {
                     <NetworkGroupSection
                       key={section.id}
                       section={section}
-                      collapsed={collapsedSections.has(`proxy:${section.id}`)}
+                      collapsed={!expandedSections.has(`proxy:${section.id}`)}
                       onToggle={() => toggleSection(`proxy:${section.id}`)}
                       onRename={(group) => setGroupDialog({ tab: "proxy", group })}
                       onDelete={(group, itemCount) =>
