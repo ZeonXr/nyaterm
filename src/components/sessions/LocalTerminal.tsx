@@ -21,6 +21,8 @@ interface LocalTerminalProps {
   setWorkingDir: (v: string) => void;
 }
 
+const BUILTIN_SHELL_PATHS = ["powershell.exe", "cmd.exe", "bash", "wsl.exe", "wt.exe"] as const;
+
 export function LocalTerminal({
   shellPath,
   setShellPath,
@@ -61,10 +63,7 @@ export function LocalTerminal({
           <div className="flex flex-col gap-2 sm:flex-row">
             <Select
               value={
-                shellPath === "powershell.exe" ||
-                shellPath === "cmd.exe" ||
-                shellPath === "bash" ||
-                shellPath === "wsl.exe"
+                BUILTIN_SHELL_PATHS.includes(shellPath as (typeof BUILTIN_SHELL_PATHS)[number])
                   ? shellPath
                   : "custom"
               }
@@ -80,6 +79,9 @@ export function LocalTerminal({
                 <SelectItem value="cmd.exe">{t("dialog.shellCmd", "Command Prompt")}</SelectItem>
                 <SelectItem value="bash">{t("dialog.shellBash", "Bash")}</SelectItem>
                 <SelectItem value="wsl.exe">{t("dialog.shellWsl", "WSL")}</SelectItem>
+                <SelectItem value="wt.exe">
+                  {t("dialog.shellWindowsTerminal", "Windows Terminal")}
+                </SelectItem>
                 <SelectItem value="custom">{t("dialog.shellCustom", "Custom...")}</SelectItem>
               </SelectContent>
             </Select>
@@ -92,10 +94,7 @@ export function LocalTerminal({
                 value={shellPath}
                 onClick={() => {
                   if (
-                    shellPath !== "powershell.exe" &&
-                    shellPath !== "cmd.exe" &&
-                    shellPath !== "bash" &&
-                    shellPath !== "wsl.exe"
+                    !BUILTIN_SHELL_PATHS.includes(shellPath as (typeof BUILTIN_SHELL_PATHS)[number])
                   ) {
                     void handlePickShellFile();
                   }

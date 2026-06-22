@@ -85,6 +85,12 @@ fn resolve_shell_command(shell_path: &str, shell_args: &str) -> Result<ShellComm
     }
 
     let args = parse_shell_args(shell_args)?;
+    #[cfg(target_os = "windows")]
+    if is_windows_terminal_alias(program) {
+        return Ok(resolve_windows_terminal_default_profile_shell(args.clone())
+            .unwrap_or_else(|| fallback_windows_terminal_shell(args)));
+    }
+
     if !args.is_empty() {
         return Ok(ShellCommandSpec {
             program: resolve_program_for_spawn(program),
@@ -108,6 +114,167 @@ fn resolve_shell_command(shell_path: &str, shell_args: &str) -> Result<ShellComm
         program: resolve_program_for_spawn(&legacy_program),
         args: legacy_parts,
     })
+}
+
+#[cfg(target_os = "windows")]
+fn is_windows_terminal_alias(program: &str) -> bool {
+    matches!(program.to_ascii_lowercase().as_str(), "wt" | "wt.exe")
+}
+
+#[cfg(target_os = "windows")]
+fn resolve_windows_terminal_default_profile_shell(
+    extra_args: Vec<String>,
+) -> Option<ShellCommandSpec> {
+    for settings_path in windows_terminal_settings_paths() {
+        let Ok(raw_settings) = std::fs::read_to_string(settings_path) else {
+            continue;
+        };
+        let Ok(settings) = serde_json::from_str::<serde_json::Value>(&raw_settings) else {
+            continue;
+        };
+        let Some(commandline) = windows_terminal_default_profile_commandline(&settings) else {
+            continue;
+        };
+        if let Some(spec) = shell_spec_from_windows_commandline(&commandline, extra_args.clone()) {
+            return Some(spec);
+        }
+    }
+
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn fallback_windows_terminal_shell(args: Vec<String>) -> ShellCommandSpec {
+    ShellCommandSpec {
+        program: resolve_program_for_spawn("powershell.exe"),
+        args,
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_terminal_settings_paths() -> Vec<PathBuf> {
+    let Some(local_data_dir) = dirs::data_local_dir() else {
+        return Vec::new();
+    };
+
+    vec![
+        local_data_dir
+            .join("Packages")
+            .join("Microsoft.WindowsTerminal_8wekyb3d8bbwe")
+            .join("LocalState")
+            .join("settings.json"),
+        local_data_dir
+            .join("Packages")
+            .join("Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe")
+            .join("LocalState")
+            .join("settings.json"),
+        local_data_dir
+            .join("Microsoft")
+            .join("Windows Terminal")
+            .join("settings.json"),
+        local_data_dir
+            .join("Microsoft")
+            .join("Windows Terminal Preview")
+            .join("settings.json"),
+    ]
+}
+
+#[cfg(target_os = "windows")]
+fn windows_terminal_default_profile_commandline(settings: &serde_json::Value) -> Option<String> {
+    let default_profile = settings.get("defaultProfile")?.as_str()?;
+    let profiles = settings.get("profiles")?.get("list")?.as_array()?;
+
+    profiles
+        .iter()
+        .find(|profile| {
+            profile
+                .get("guid")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|guid| guid.eq_ignore_ascii_case(default_profile))
+        })
+        .and_then(windows_terminal_profile_commandline)
+}
+
+#[cfg(target_os = "windows")]
+fn windows_terminal_profile_commandline(profile: &serde_json::Value) -> Option<String> {
+    if let Some(commandline) = profile
+        .get("commandline")
+        .and_then(serde_json::Value::as_str)
+        .map(expand_windows_env_vars)
+    {
+        return Some(commandline);
+    }
+
+    let name = profile
+        .get("name")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let source = profile
+        .get("source")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    if name.contains("powershell") {
+        Some("powershell.exe".to_string())
+    } else if name.contains("command prompt") || name.contains("cmd") || name.contains("命令提示符")
+    {
+        Some("cmd.exe".to_string())
+    } else if source.contains("wsl") || name.contains("ubuntu") || name.contains("debian") {
+        Some("wsl.exe".to_string())
+    } else {
+        None
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn shell_spec_from_windows_commandline(
+    commandline: &str,
+    extra_args: Vec<String>,
+) -> Option<ShellCommandSpec> {
+    let mut parts = parse_shell_args(commandline).ok()?;
+    if parts.is_empty() {
+        return None;
+    }
+
+    let program = parts.remove(0);
+    parts.extend(extra_args);
+
+    Some(ShellCommandSpec {
+        program: resolve_program_for_spawn(&program),
+        args: parts,
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn expand_windows_env_vars(value: &str) -> String {
+    let mut expanded = String::with_capacity(value.len());
+    let mut rest = value;
+
+    while let Some(start) = rest.find('%') {
+        expanded.push_str(&rest[..start]);
+        let after_start = &rest[start + 1..];
+        let Some(end) = after_start.find('%') else {
+            expanded.push_str(&rest[start..]);
+            return expanded;
+        };
+
+        let name = &after_start[..end];
+        if name.is_empty() {
+            expanded.push_str("%%");
+        } else if let Ok(env_value) = std::env::var(name) {
+            expanded.push_str(&env_value);
+        } else {
+            expanded.push('%');
+            expanded.push_str(name);
+            expanded.push('%');
+        }
+        rest = &after_start[end + 1..];
+    }
+
+    expanded.push_str(rest);
+    expanded
 }
 
 fn resolve_program_for_spawn(program: &str) -> String {
@@ -1098,6 +1265,37 @@ mod tests {
                 spec.program
             );
         }
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn windows_terminal_alias_does_not_spawn_wt_host() {
+        let spec = resolve_shell_command("wt.exe", "").expect("command spec");
+
+        assert!(
+            !spec.program.to_ascii_lowercase().ends_with("wt.exe"),
+            "wt.exe should resolve to an embeddable shell, got {}",
+            spec.program
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn windows_terminal_profile_commandline_is_parsed_as_shell_spec() {
+        let spec = super::shell_spec_from_windows_commandline(
+            r#"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo"#,
+            vec!["-NoExit".to_string()],
+        )
+        .expect("command spec");
+
+        assert!(
+            spec.program
+                .to_ascii_lowercase()
+                .ends_with("powershell.exe"),
+            "program was {}",
+            spec.program
+        );
+        assert_eq!(spec.args, vec!["-NoLogo", "-NoExit"]);
     }
 
     #[test]
