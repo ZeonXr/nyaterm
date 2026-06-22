@@ -556,6 +556,8 @@ impl<'a> KeyboardInteractiveMode<'a> {
     }
 }
 
+const MAX_KEYBOARD_INTERACTIVE_RESTARTS: u32 = 8;
+
 fn resolve_otp_info(app: &AppHandle, connection_id: &str) -> Option<OtpAutoFillInfo> {
     let conn = crate::config::load_connection_by_id(app, connection_id).ok()?;
     let auth = conn.auth.as_ref()?;
@@ -738,6 +740,9 @@ async fn finish_keyboard_interactive(
         Some(json!({
             "username": username,
             "mode": mode.label(),
+            "auth_round": 0,
+            "partial_success_restart": false,
+            "response_kind": "start",
         })),
         None,
     );
@@ -748,6 +753,7 @@ async fn finish_keyboard_interactive(
         .map_err(|error| AppError::Auth(format!("Keyboard-interactive start failed: {}", error)))?;
     let mut pending_totp_use: Option<TotpUseCandidate> = None;
     let mut round: u32 = 0;
+    let mut restart_count: u32 = 0;
 
     loop {
         match step {
@@ -765,6 +771,8 @@ async fn finish_keyboard_interactive(
                     Some(json!({
                         "username": username,
                         "mode": mode.label(),
+                        "auth_round": round,
+                        "response_kind": "success",
                     })),
                     None,
                 );
@@ -774,6 +782,67 @@ async fn finish_keyboard_interactive(
                 remaining_methods,
                 partial_success,
             } => {
+                let keyboard_interactive_available =
+                    remaining_methods.contains(&MethodKind::KeyboardInteractive);
+                if partial_success && keyboard_interactive_available {
+                    if let Some(candidate) = pending_totp_use.take() {
+                        record_totp_code_use(candidate);
+                    }
+
+                    restart_count = restart_count.saturating_add(1);
+                    if restart_count <= MAX_KEYBOARD_INTERACTIVE_RESTARTS {
+                        log_structured(
+                            StructuredLogLevel::Info,
+                            "ssh.auth",
+                            "keyboard_interactive.partial_success",
+                            "Keyboard-interactive partial success, restarting keyboard-interactive authentication",
+                            connection_id,
+                            None,
+                            Some(json!({
+                                "username": username,
+                                "mode": mode.label(),
+                                "remaining_methods": format!("{remaining_methods:?}"),
+                                "partial_success": partial_success,
+                                "partial_success_restart": true,
+                                "auth_round": round,
+                                "restart_count": restart_count,
+                                "max_restarts": MAX_KEYBOARD_INTERACTIVE_RESTARTS,
+                                "response_kind": "failure",
+                            })),
+                            None,
+                        );
+
+                        log_structured(
+                            StructuredLogLevel::Info,
+                            "ssh.auth",
+                            "keyboard_interactive.start",
+                            "Restarting keyboard-interactive authentication after partial success",
+                            connection_id,
+                            None,
+                            Some(json!({
+                                "username": username,
+                                "mode": mode.label(),
+                                "auth_round": round,
+                                "restart_count": restart_count,
+                                "partial_success_restart": true,
+                                "response_kind": "start",
+                            })),
+                            None,
+                        );
+
+                        step = handle
+                            .authenticate_keyboard_interactive_start(username, None)
+                            .await
+                            .map_err(|error| {
+                                AppError::Auth(format!(
+                                    "Keyboard-interactive restart failed: {}",
+                                    error
+                                ))
+                            })?;
+                        continue;
+                    }
+                }
+
                 log_structured(
                     StructuredLogLevel::Warn,
                     "ssh.auth",
@@ -786,6 +855,11 @@ async fn finish_keyboard_interactive(
                         "mode": mode.label(),
                         "remaining_methods": format!("{remaining_methods:?}"),
                         "partial_success": partial_success,
+                        "partial_success_restart": partial_success && keyboard_interactive_available,
+                        "auth_round": round,
+                        "restart_count": restart_count,
+                        "max_restarts": MAX_KEYBOARD_INTERACTIVE_RESTARTS,
+                        "response_kind": "failure",
                     })),
                     None,
                 );
@@ -813,6 +887,8 @@ async fn finish_keyboard_interactive(
                         "prompt_count": prompts.len(),
                         "hidden_prompts": hidden_prompts,
                         "round": round,
+                        "auth_round": round,
+                        "response_kind": "info_request",
                     })),
                     None,
                 );
@@ -852,6 +928,7 @@ async fn finish_keyboard_interactive(
                             "otp_entry_id": info.otp_id,
                             "prompt_count": prompts.len(),
                             "round": round,
+                            "auth_round": round,
                         })),
                         None,
                     );
@@ -896,6 +973,8 @@ async fn finish_keyboard_interactive(
                             "prompt_count": payload.prompts.len(),
                             "otp_entry_id": payload.otp_entry_id,
                             "round": payload.round,
+                            "auth_round": round,
+                            "response_kind": "info_request",
                         })),
                         None,
                     );
