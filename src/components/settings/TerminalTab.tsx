@@ -145,6 +145,20 @@ export function TerminalTab() {
           />
         </SettingRow>
 
+        <SettingRow
+          label={t("settings.showWorkspacePadding")}
+          desc={t("settings.showWorkspacePaddingDesc")}
+        >
+          <SettingSwitch
+            checked={appSettings.terminal.show_workspace_padding ?? false}
+            onChange={(v) =>
+              updateAppSettings({
+                terminal: { ...appSettings.terminal, show_workspace_padding: v },
+              })
+            }
+          />
+        </SettingRow>
+
         <SettingRow label={t("settings.showLineNumbers")} desc={t("settings.showLineNumbersDesc")}>
           <SettingSwitch
             checked={appSettings.terminal.show_line_numbers}

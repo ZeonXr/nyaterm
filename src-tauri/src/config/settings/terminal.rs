@@ -68,6 +68,8 @@ pub struct TerminalSettings {
     #[serde(default)]
     pub action_links_matchers: ActionLinksMatcherSettings,
     #[serde(default = "default_false")]
+    pub show_workspace_padding: bool,
+    #[serde(default = "default_false")]
     pub show_line_numbers: bool,
     #[serde(default = "default_false")]
     pub show_timestamps: bool,
@@ -97,6 +99,7 @@ impl Default for TerminalSettings {
             keyword_highlights: Vec::new(),
             action_links_enabled: false,
             action_links_matchers: ActionLinksMatcherSettings::default(),
+            show_workspace_padding: false,
             show_line_numbers: false,
             show_timestamps: false,
             show_timestamp_milliseconds: false,

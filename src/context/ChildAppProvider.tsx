@@ -74,6 +74,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
       archive: true,
       host_port: true,
     },
+    show_workspace_padding: false,
     show_line_numbers: false,
     show_timestamps: false,
     show_timestamp_milliseconds: false,

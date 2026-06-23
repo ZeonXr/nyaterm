@@ -156,7 +156,9 @@ export default function XTerminal({
   const showLineNumbers = terminalSettings.show_line_numbers;
   const showTimestamps = terminalSettings.show_timestamps;
   const showTimestampMilliseconds = terminalSettings.show_timestamp_milliseconds ?? false;
+  const showWorkspacePadding = terminalSettings.show_workspace_padding ?? false;
   const showGutter = showLineNumbers || showTimestamps;
+  const showContentPadding = showWorkspacePadding && !showGutter;
   const commandSuggestionsEnabled = interaction.command_suggestions_enabled;
   const commandSuggestionMinChars = interaction.command_suggestion_min_chars;
   const commandSuggestionMaxChars = interaction.command_suggestion_max_chars;
@@ -1924,6 +1926,19 @@ export default function XTerminal({
     }
   }, [performanceMode, sessionId, showGutter, terminalReady]);
 
+  useEffect(() => {
+    const paddingEnabled = showContentPadding;
+    if (!terminalReady || !fitAddonRef.current || !terminalRef.current) return;
+
+    requestAnimationFrame(() => {
+      if (paddingEnabled !== ((terminalSettings.show_workspace_padding ?? false) && !showGutter)) {
+        return;
+      }
+      fitAddonRef.current?.fit();
+      terminalRef.current?.refresh(0, Math.max(0, terminalRef.current.rows - 1));
+    });
+  }, [showContentPadding, showGutter, terminalReady, terminalSettings.show_workspace_padding]);
+
   // Re-fit and focus when tab becomes active
   useEffect(() => {
     if (active && visible && terminalReady && fitAddonRef.current && terminalRef.current) {
@@ -2111,7 +2126,9 @@ export default function XTerminal({
           onFind={doFind}
           onPasteText={handlePasteText}
         >
-          <div ref={containerRef} className="h-full w-full" />
+          <div className={`h-full w-full ${showContentPadding ? "pl-2" : ""}`}>
+            <div ref={containerRef} className="h-full w-full" />
+          </div>
         </TerminalContextMenu>
 
         {isExternalDropActive && (
