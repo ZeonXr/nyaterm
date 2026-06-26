@@ -28,8 +28,15 @@ export default function NyaTermLogo({ className, ...props }: NyaTermLogoProps) {
 
         <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
           <rect x="0" y="0" width="1024" height="1024" fill="white" />
-          <circle cx="420" cy="558" r="44" fill="black" />
-          <circle cx="604" cy="558" r="44" fill="black" />
+          <path
+            d="M378 506 L474 556 L378 606"
+            fill="none"
+            stroke="black"
+            strokeWidth="38"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <line x1="486" y1="686" x2="594" y2="686" stroke="black" strokeWidth="36" strokeLinecap="round" />
         </mask>
       </defs>
 

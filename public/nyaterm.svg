@@ -1,15 +1,15 @@
 <svg width="256" height="256" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="nya-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="var(--grad-from, #06b6d4)" />
-      <stop offset="100%" stop-color="var(--grad-to, #2563eb)" />
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#2563eb" />
     </linearGradient>
 
-    <!-- Cut out perfectly smooth transparent eyes -->
+    <!-- Cut out an abstract terminal prompt face -->
     <mask id="eye-cutouts" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
       <rect x="0" y="0" width="1024" height="1024" fill="white"/>
-      <circle cx="420" cy="558" r="44" fill="black"/>
-      <circle cx="604" cy="558" r="44" fill="black"/>
+      <path d="M378 506 L474 556 L378 606" fill="none" stroke="black" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="486" y1="686" x2="594" y2="686" stroke="black" stroke-width="36" stroke-linecap="round"/>
     </mask>
   </defs>
 
