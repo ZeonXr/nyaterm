@@ -239,7 +239,6 @@ export async function uploadFilesViaZmodem(
     i18n.t("zmodem.preparingUpload", { count: filePaths.length }),
   );
 
-  // Netcatty approach: probe remote directory and delete conflicting files
   // BEFORE sending `rz`, so the remote rz never sees an existing file to
   // prompt about.  If the SFTP channel is busy (e.g. file explorer panel is
   // open), the probe is time-boxed and we fall through.
