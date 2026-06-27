@@ -31,7 +31,9 @@ pub use pty::{LocalSessionConfig, create_local_session};
 pub use quick_commands::{
     QuickCommandsImportResult, QuickCommandsImportSource, QuickCommandsStore,
 };
-pub use recording::RecordingManager;
+pub use recording::{
+    RecordingManager, TerminalHistorySearchRequest, TerminalHistorySearchResponse,
+};
 pub use serial::{SerialConfig, create_serial_session, list_serial_ports};
 pub(crate) use session::update_cwd_if_changed;
 pub use session::{

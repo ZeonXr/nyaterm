@@ -1,16 +1,23 @@
 use crate::error::{AppError, AppResult};
+use regex::RegexBuilder;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::mem;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
+use std::time::Instant;
 use time::OffsetDateTime;
 
 pub const DEFAULT_MEMORY_LIMIT_BYTES: usize = 5 * 1024 * 1024;
+pub const DEFAULT_HISTORY_SEARCH_LINES: usize = 30_000;
+pub const MAX_HISTORY_SEARCH_LINES: usize = 100_000;
+pub const DEFAULT_HISTORY_SEARCH_LIMIT: usize = 100;
 
 #[derive(Clone, Debug)]
 struct TranscriptRecord {
+    line_id: u64,
     timestamp: String,
     label: &'static str,
     data: String,
@@ -18,10 +25,11 @@ struct TranscriptRecord {
 }
 
 impl TranscriptRecord {
-    fn new(label: &'static str, data: String) -> Self {
+    fn new(line_id: u64, label: &'static str, data: String) -> Self {
         let timestamp = chrono_timestamp();
         let size_bytes = format_record_parts(&timestamp, label, &data, true, true).len();
         Self {
+            line_id,
             timestamp,
             label,
             data,
@@ -38,6 +46,45 @@ impl TranscriptRecord {
             include_timestamps,
         )
     }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalHistorySearchRequest {
+    pub session_id: String,
+    pub query: String,
+    #[serde(default)]
+    pub case_sensitive: bool,
+    #[serde(default)]
+    pub regex: bool,
+    #[serde(default)]
+    pub whole_word: bool,
+    pub limit: Option<usize>,
+    pub context_before: Option<usize>,
+    pub context_after: Option<usize>,
+    pub max_lines: Option<usize>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalHistorySearchResponse {
+    pub total: usize,
+    pub elapsed_ms: u128,
+    pub truncated: bool,
+    pub results: Vec<TerminalHistorySearchResult>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalHistorySearchResult {
+    pub line_id: u64,
+    pub line_number: usize,
+    pub column_start: usize,
+    pub column_end: usize,
+    pub preview: String,
+    pub before: Vec<String>,
+    pub after: Vec<String>,
+    pub source: String,
 }
 
 struct FileRecording {
@@ -85,6 +132,7 @@ struct SessionCaptureState {
     live_echo_buffer: String,
     submitted_line_echo: Option<String>,
     suppress_next_newline: bool,
+    next_line_id: u64,
 }
 
 impl SessionCaptureState {
@@ -99,6 +147,7 @@ impl SessionCaptureState {
             live_echo_buffer: String::new(),
             submitted_line_echo: None,
             suppress_next_newline: false,
+            next_line_id: 1,
         }
     }
 
@@ -216,7 +265,9 @@ impl SessionCaptureState {
             return;
         }
 
-        let record = TranscriptRecord::new(label, data);
+        let line_id = self.next_line_id;
+        self.next_line_id = self.next_line_id.saturating_add(1);
+        let record = TranscriptRecord::new(line_id, label, data);
         if let Some(recording) = self.recording.as_mut() {
             recording.write_record(&record);
         }
@@ -386,6 +437,73 @@ impl RecordingManager {
         Ok(path.to_string_lossy().to_string())
     }
 
+    pub fn search_history(
+        &self,
+        request: TerminalHistorySearchRequest,
+    ) -> AppResult<TerminalHistorySearchResponse> {
+        let started = Instant::now();
+        let query = request.query;
+        if query.is_empty() {
+            return Ok(TerminalHistorySearchResponse {
+                total: 0,
+                elapsed_ms: started.elapsed().as_millis(),
+                truncated: false,
+                results: Vec::new(),
+            });
+        }
+
+        let limit = request.limit.unwrap_or(DEFAULT_HISTORY_SEARCH_LIMIT).max(1);
+        let context_before = request.context_before.unwrap_or(0).min(20);
+        let context_after = request.context_after.unwrap_or(0).min(20);
+        let max_lines = request
+            .max_lines
+            .unwrap_or(DEFAULT_HISTORY_SEARCH_LINES)
+            .clamp(1, MAX_HISTORY_SEARCH_LINES);
+        let records = {
+            let mut sessions = lock_recover(&self.sessions);
+            sessions
+                .get_mut(&request.session_id)
+                .map(SessionCaptureState::snapshot_records)
+                .unwrap_or_default()
+        };
+        let start_index = records.len().saturating_sub(max_lines);
+        let searched_records = &records[start_index..];
+        let matcher = HistoryMatcher::new(
+            &query,
+            request.case_sensitive,
+            request.regex,
+            request.whole_word,
+        )?;
+        let mut total = 0usize;
+        let mut results = Vec::new();
+
+        for (relative_index, record) in searched_records.iter().enumerate() {
+            if let Some((column_start, column_end)) = matcher.find(&record.data) {
+                total += 1;
+                if results.len() < limit {
+                    let absolute_index = start_index + relative_index;
+                    results.push(TerminalHistorySearchResult {
+                        line_id: record.line_id,
+                        line_number: absolute_index + 1,
+                        column_start,
+                        column_end,
+                        preview: record.data.clone(),
+                        before: context_records(&records, absolute_index, context_before, true),
+                        after: context_records(&records, absolute_index, context_after, false),
+                        source: record.label.to_ascii_lowercase(),
+                    });
+                }
+            }
+        }
+
+        Ok(TerminalHistorySearchResponse {
+            total,
+            elapsed_ms: started.elapsed().as_millis(),
+            truncated: total > results.len() || records.len() > max_lines,
+            results,
+        })
+    }
+
     pub fn set_memory_limit(&self, max_bytes: usize) {
         let bounded = max_bytes.max(1);
         *lock_recover(&self.memory_limit_bytes) = bounded;
@@ -510,6 +628,124 @@ fn lock_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+enum HistoryMatcher {
+    Literal {
+        needle: String,
+        case_sensitive: bool,
+        whole_word: bool,
+    },
+    Regex(regex::Regex),
+}
+
+impl HistoryMatcher {
+    fn new(query: &str, case_sensitive: bool, regex: bool, whole_word: bool) -> AppResult<Self> {
+        if regex {
+            let pattern = if whole_word {
+                format!(r"\b(?:{query})\b")
+            } else {
+                query.to_string()
+            };
+            let compiled = RegexBuilder::new(&pattern)
+                .case_insensitive(!case_sensitive)
+                .build()
+                .map_err(|error| {
+                    AppError::Config(format!("Invalid regular expression: {error}"))
+                })?;
+            return Ok(Self::Regex(compiled));
+        }
+
+        let needle = if case_sensitive {
+            query.to_string()
+        } else {
+            query.to_lowercase()
+        };
+
+        Ok(Self::Literal {
+            needle,
+            case_sensitive,
+            whole_word,
+        })
+    }
+
+    fn find(&self, haystack: &str) -> Option<(usize, usize)> {
+        match self {
+            Self::Literal {
+                needle,
+                case_sensitive,
+                whole_word,
+            } => {
+                let searchable = if *case_sensitive {
+                    haystack.to_string()
+                } else {
+                    haystack.to_lowercase()
+                };
+                find_literal_match(&searchable, needle, *whole_word)
+            }
+            Self::Regex(regex) => regex
+                .find(haystack)
+                .map(|found| (found.start(), found.end())),
+        }
+    }
+}
+
+fn find_literal_match(haystack: &str, needle: &str, whole_word: bool) -> Option<(usize, usize)> {
+    if needle.is_empty() {
+        return None;
+    }
+
+    let mut offset = 0;
+    while offset <= haystack.len() {
+        let relative = haystack[offset..].find(needle)?;
+        let start = offset + relative;
+        let end = start + needle.len();
+
+        if !whole_word || is_word_boundary_match(haystack, start, end) {
+            return Some((start, end));
+        }
+
+        offset = end;
+    }
+
+    None
+}
+
+fn is_word_boundary_match(text: &str, start: usize, end: usize) -> bool {
+    let before = text[..start].chars().next_back();
+    let after = text[end..].chars().next();
+
+    before.is_none_or(|ch| !is_word_char(ch)) && after.is_none_or(|ch| !is_word_char(ch))
+}
+
+fn is_word_char(ch: char) -> bool {
+    ch.is_alphanumeric() || ch == '_'
+}
+
+fn context_records(
+    records: &[TranscriptRecord],
+    index: usize,
+    count: usize,
+    before: bool,
+) -> Vec<String> {
+    if count == 0 {
+        return Vec::new();
+    }
+
+    if before {
+        let start = index.saturating_sub(count);
+        return records[start..index]
+            .iter()
+            .map(|record| record.data.clone())
+            .collect();
+    }
+
+    let start = index.saturating_add(1);
+    let end = start.saturating_add(count).min(records.len());
+    records[start..end]
+        .iter()
+        .map(|record| record.data.clone())
+        .collect()
 }
 
 fn strip_terminal_control_sequences(text: &str) -> String {
@@ -758,6 +994,95 @@ mod tests {
         assert!(saved.contains("readydone"));
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_history_search_finds_literal_matches() {
+        let manager = RecordingManager::new();
+        manager.write_output("s1", "alpha\nbeta install\nbeta done\n");
+
+        let result = manager
+            .search_history(super::TerminalHistorySearchRequest {
+                session_id: "s1".to_string(),
+                query: "beta".to_string(),
+                case_sensitive: false,
+                regex: false,
+                whole_word: false,
+                limit: Some(100),
+                context_before: Some(1),
+                context_after: Some(1),
+                max_lines: None,
+            })
+            .unwrap();
+
+        assert_eq!(result.total, 2);
+        assert_eq!(result.results.len(), 2);
+        assert_eq!(result.results[0].line_number, 2);
+        assert_eq!(result.results[0].before, vec!["alpha"]);
+        assert_eq!(result.results[0].after, vec!["beta done"]);
+        assert_eq!(result.results[0].source, "output");
+    }
+
+    #[test]
+    fn terminal_history_search_honors_case_and_whole_word() {
+        let manager = RecordingManager::new();
+        manager.write_output("s1", "install\nInstall\ninstaller\n");
+
+        let case_sensitive = manager
+            .search_history(super::TerminalHistorySearchRequest {
+                session_id: "s1".to_string(),
+                query: "Install".to_string(),
+                case_sensitive: true,
+                regex: false,
+                whole_word: false,
+                limit: Some(100),
+                context_before: Some(0),
+                context_after: Some(0),
+                max_lines: None,
+            })
+            .unwrap();
+        assert_eq!(case_sensitive.total, 1);
+        assert_eq!(case_sensitive.results[0].preview, "Install");
+
+        let whole_word = manager
+            .search_history(super::TerminalHistorySearchRequest {
+                session_id: "s1".to_string(),
+                query: "install".to_string(),
+                case_sensitive: false,
+                regex: false,
+                whole_word: true,
+                limit: Some(100),
+                context_before: Some(0),
+                context_after: Some(0),
+                max_lines: None,
+            })
+            .unwrap();
+        assert_eq!(whole_word.total, 2);
+    }
+
+    #[test]
+    fn terminal_history_search_supports_regex_limit_and_truncation() {
+        let manager = RecordingManager::new();
+        manager.write_output("s1", "error 100\nerror 200\nok\n");
+
+        let result = manager
+            .search_history(super::TerminalHistorySearchRequest {
+                session_id: "s1".to_string(),
+                query: r"error \d+".to_string(),
+                case_sensitive: false,
+                regex: true,
+                whole_word: false,
+                limit: Some(1),
+                context_before: Some(0),
+                context_after: Some(0),
+                max_lines: None,
+            })
+            .unwrap();
+
+        assert_eq!(result.total, 2);
+        assert_eq!(result.results.len(), 1);
+        assert!(result.truncated);
+        assert_eq!(result.results[0].preview, "error 100");
     }
 
     #[test]

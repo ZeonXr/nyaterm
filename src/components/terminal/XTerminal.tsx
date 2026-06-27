@@ -66,6 +66,7 @@ import {
   consumePreservedTerminalReconnectContent,
   registerTerminalReconnectCapture,
 } from "@/lib/terminalReconnectHistory";
+import { TERMINAL_SEARCH_VISIBLE_MATCH_LIMIT } from "@/lib/terminalSearch";
 import { XTERM_PERFORMANCE_CONFIG } from "@/lib/xtermPerformance";
 import type { AiCaptureEvent, SessionType } from "@/types/global";
 import ActionLinkMenu from "./ActionLinkMenu";
@@ -349,21 +350,25 @@ export default function XTerminal({
 
   // Search Addon state and handlers
   const {
-    searchAddonRef,
+    registerSearchAddon,
     showSearchBar,
     setShowSearchBar,
     searchQuery,
     setSearchQuery,
     searchState,
+    searchFlags,
+    setSearchFlag,
+    activeMode,
+    setActiveMode,
+    historyState,
     handleSearchNext,
     handleSearchPrev,
     handleCloseSearch,
   } = useTerminalSearch(terminalRef, {
     terminal: terminalInstance,
+    sessionId,
     visible: visible && active,
     performanceMode,
-    incremental: true,
-    decorationPolicy: "navigation",
   });
 
   // Shell integration state
@@ -501,7 +506,7 @@ export default function XTerminal({
       webLinksAddon,
       removePopup: removeLinkPopup,
     } = createTerminalLinkHandlers(terminal, tRef);
-    const searchAddon = new SearchAddon();
+    const searchAddon = new SearchAddon({ highlightLimit: TERMINAL_SEARCH_VISIBLE_MATCH_LIMIT });
     const zmodemHandler = createZmodemEventHandler(
       terminal,
       sessionId,
@@ -515,7 +520,7 @@ export default function XTerminal({
     terminal.loadAddon(searchAddon);
     terminal.open(containerRef.current);
 
-    searchAddonRef.current = searchAddon;
+    registerSearchAddon(searchAddon);
 
     terminalRef.current = terminal;
     setTerminalInstance(terminal);
@@ -1980,7 +1985,7 @@ export default function XTerminal({
       terminalRef.current = null;
       setTerminalInstance(null);
       fitAddonRef.current = null;
-      searchAddonRef.current = null;
+      registerSearchAddon(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
@@ -2275,7 +2280,12 @@ export default function XTerminal({
           show={showSearchBar}
           searchQuery={searchQuery}
           searchState={searchState}
+          searchFlags={searchFlags}
+          activeMode={activeMode}
+          historyState={historyState}
           setSearchQuery={setSearchQuery}
+          onModeChange={setActiveMode}
+          onSearchFlagChange={setSearchFlag}
           onNext={handleSearchNext}
           onPrev={handleSearchPrev}
           onClose={handleCloseSearch}

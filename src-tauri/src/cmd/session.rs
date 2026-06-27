@@ -2,6 +2,7 @@ use crate::config;
 use crate::core::ssh::{self, HostKeyVerifyManager, PendingAuthManager};
 use crate::core::{
     self, QuickCommandsStore, RecordingManager, SessionCommand, SessionInfo, SessionManager,
+    TerminalHistorySearchRequest, TerminalHistorySearchResponse,
 };
 use crate::error::{AppError, AppResult};
 use crate::observability::{self, StructuredLog, StructuredLogLevel};
@@ -760,6 +761,17 @@ pub async fn save_session_transcript(
     })
     .await
     .map_err(|e| AppError::Config(format!("Task join error: {e}")))?
+}
+
+#[tauri::command]
+pub async fn terminal_history_search(
+    state: tauri::State<'_, Arc<RecordingManager>>,
+    request: TerminalHistorySearchRequest,
+) -> AppResult<TerminalHistorySearchResponse> {
+    let mgr = state.inner().clone();
+    tokio::task::spawn_blocking(move || mgr.search_history(request))
+        .await
+        .map_err(|e| AppError::Config(format!("Task join error: {e}")))?
 }
 
 #[tauri::command]
