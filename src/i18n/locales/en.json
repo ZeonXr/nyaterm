@@ -1799,7 +1799,7 @@
     "noUpdate": "Already up to date.",
     "openReleases": "Open Releases",
     "portableManualDesc": "Portable edition cannot auto-update. Download the latest zip, close NyaTerm, replace files, and keep your data folder.",
-    "portableManualTitle": "Portable updates are manual",
+    "portableManualTitle": "Update available for portable edition",
     "readyToRestart": "Update installed. Restart to complete.",
     "releaseDate": "Release Date",
     "releaseNotes": "Notes",
