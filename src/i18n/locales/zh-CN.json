@@ -997,6 +997,7 @@
     "count": "发送次数",
     "currentSession": "当前会话",
     "dataType": "数据类型",
+    "groupSession": "分组：{{name}}（{{count}}）",
     "hex": "十六进制",
     "hexAscii": "ASCII",
     "hexByte": "十六进制字节",

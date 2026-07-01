@@ -997,6 +997,7 @@
     "count": "Count",
     "currentSession": "Current session",
     "dataType": "Data Type",
+    "groupSession": "Group: {{name}} ({{count}})",
     "hex": "Hex",
     "hexAscii": "ASCII",
     "hexByte": "Hex byte",
