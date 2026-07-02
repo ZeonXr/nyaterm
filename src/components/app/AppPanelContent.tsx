@@ -3,6 +3,7 @@ import ResizeHandle from "@/components/layout/ResizeHandle";
 import ActiveSessions from "@/components/panel/ActiveSessions";
 import AIAssistantPanel from "@/components/panel/ai/AIAssistantPanel";
 import CommandHistory from "@/components/panel/CommandHistory";
+import DockerManager from "@/components/panel/DockerManager";
 import FileExplorer from "@/components/panel/file-explorer";
 import FileTransfer from "@/components/panel/file-explorer/FileTransfer";
 import NetworkPanel from "@/components/panel/NetworkPanel";
@@ -123,6 +124,10 @@ export default function AppPanelContent({
         return <CommandHistory activeSessionId={activeSessionId} onCommandSend={onCommandSend} />;
       case "resourceMonitor":
         return <ResourceMonitor activeSessionId={activeSshSessionId} />;
+      case "processManager":
+        return <ProcessManager activeSessionId={activeSshSessionId} />;
+      case "dockerManager":
+        return <DockerManager activeSessionId={activeSshSessionId} />;
       case "aiAssistant":
         return null;
       default:
