@@ -30,7 +30,6 @@ type QuickSwitcherItem =
       title: string;
       subtitle: string;
       display: string;
-      rank: number;
       order: number;
       session: QuickSwitcherSession;
     }
@@ -40,7 +39,6 @@ type QuickSwitcherItem =
       title: string;
       subtitle: string;
       display: string;
-      rank: number;
       order: number;
       connection: SavedConnection;
     };
@@ -92,10 +90,6 @@ function stringifySearchParts(parts: unknown[]) {
     .filter((part) => part !== undefined && part !== null && part !== "")
     .map(String)
     .join(" ");
-}
-
-function sortByDefaultPriority(left: QuickSwitcherItem, right: QuickSwitcherItem) {
-  return left.rank - right.rank || left.order - right.order;
 }
 
 export default function SessionQuickSwitcher({
@@ -151,7 +145,6 @@ export default function SessionQuickSwitcher({
           session.connectError,
           status,
         ]),
-        rank: session.id === activeSessionId ? 0 : 1,
         order: index,
         session,
       };
@@ -176,16 +169,13 @@ export default function SessionQuickSwitcher({
           connection.working_dir,
           subtitle,
         ]),
-        rank: 2,
         order: workspaceSessions.length + index,
         connection,
       };
     });
 
     return [...sessionItems, ...connectionItems];
-  }, [activeSessionId, savedConnections, t, workspaceSessions]);
-
-  const sortedItems = useMemo(() => [...items].sort(sortByDefaultPriority), [items]);
+  }, [savedConnections, t, workspaceSessions]);
 
   const candidates = useMemo<FuzzySearchCandidate[]>(
     () =>
@@ -226,11 +216,7 @@ export default function SessionQuickSwitcher({
             const leftItem = itemById.get(left.id);
             const rightItem = itemById.get(right.id);
             if (!leftItem || !rightItem) return 0;
-            return (
-              leftItem.rank - rightItem.rank ||
-              right.score - left.score ||
-              leftItem.order - rightItem.order
-            );
+            return right.score - left.score || leftItem.order - rightItem.order;
           })
           .map((result) => result.id);
 
@@ -247,8 +233,8 @@ export default function SessionQuickSwitcher({
   }, [candidates, itemById, open, query]);
 
   const filteredItems = useMemo(
-    () => (matchedItemIds ? matchedItemIds.flatMap((id) => itemById.get(id) ?? []) : sortedItems),
-    [itemById, matchedItemIds, sortedItems],
+    () => (matchedItemIds ? matchedItemIds.flatMap((id) => itemById.get(id) ?? []) : items),
+    [itemById, items, matchedItemIds],
   );
 
   useEffect(() => {
