@@ -87,7 +87,13 @@ mod name_list {
             if value.is_empty() {
                 return Ok(Self(Vec::new()));
             }
-            Ok(Self(value.split(',').try_fold(
+
+            let mut names = value.split(',').collect::<Vec<_>>();
+            if names.last() == Some(&"") && names.len() > 1 {
+                names.pop();
+            }
+
+            Ok(Self(names.into_iter().try_fold(
                 Vec::new(),
                 |mut list, name| {
                     if name.is_empty() || !name.is_ascii() {
@@ -139,17 +145,55 @@ mod name_list {
         }
 
         #[test]
-        fn name_list_round_trip() {
+        fn normal_name_list_round_trip() {
             let nl = NameList::from_encoded_string("a,b,c").unwrap();
             assert_eq!(nl.0, vec!["a", "b", "c"]);
             assert_eq!(nl.as_encoded_string(), "a,b,c");
         }
 
         #[test]
-        fn name_list_rejects_empty_entry() {
+        fn trailing_comma_is_accepted() {
+            let nl = NameList::from_encoded_string("aes256-ctr,").unwrap();
+            assert_eq!(nl.0, vec!["aes256-ctr"]);
+        }
+
+        #[test]
+        fn trailing_comma_multiple_names_is_accepted() {
+            let nl = NameList::from_encoded_string("hmac-md5,hmac-sha1,").unwrap();
+            assert_eq!(nl.0, vec!["hmac-md5", "hmac-sha1"]);
+        }
+
+        #[test]
+        fn compression_trailing_comma_is_accepted() {
+            let nl = NameList::from_encoded_string("none,zlib@openssh.com,zlib,").unwrap();
+            assert_eq!(nl.0, vec!["none", "zlib@openssh.com", "zlib"]);
+        }
+
+        #[test]
+        fn middle_empty_entry_is_rejected() {
             // An empty entry mid-list (",,") is still invalid — only
             // the zero-length whole-list case is allowed.
             assert!(NameList::from_encoded_string("a,,b").is_err());
+        }
+
+        #[test]
+        fn leading_empty_entry_is_rejected() {
+            assert!(NameList::from_encoded_string(",a").is_err());
+        }
+
+        #[test]
+        fn single_comma_is_rejected() {
+            assert!(NameList::from_encoded_string(",").is_err());
+        }
+
+        #[test]
+        fn double_comma_is_rejected() {
+            assert!(NameList::from_encoded_string(",,").is_err());
+        }
+
+        #[test]
+        fn non_ascii_name_is_rejected() {
+            assert!(NameList::from_encoded_string("aes256-ctr,\u{00e9}").is_err());
         }
     }
 }
