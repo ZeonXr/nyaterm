@@ -27,6 +27,11 @@ pub fn get_saved_connections(app: tauri::AppHandle) -> AppResult<Vec<SavedConnec
 }
 
 #[tauri::command]
+pub fn get_supported_ssh_algorithms() -> crate::core::ssh::SupportedSshAlgorithms {
+    crate::core::ssh::get_supported_ssh_algorithms()
+}
+
+#[tauri::command]
 pub fn save_connection(
     app: tauri::AppHandle,
     mut connection: SavedConnection,
@@ -41,6 +46,7 @@ pub fn save_connection(
 
     validate_proxy_jump_config(&connection, &cfg.connections)?;
     validate_local_terminal_config(&connection)?;
+    validate_ssh_algorithm_config(&connection)?;
 
     if let Some(ref mut auth) = connection.auth {
         // password_id: Some("") means explicitly cleared, None means preserve existing
@@ -75,6 +81,18 @@ pub fn save_connection(
     let _ = app.emit("connections-changed", ());
     schedule_cloud_sync_notify(app.clone());
     Ok(target_id)
+}
+
+fn validate_ssh_algorithm_config(connection: &SavedConnection) -> AppResult<()> {
+    if !matches!(connection.config, config::ConnectionType::Ssh { .. }) {
+        return Ok(());
+    }
+
+    let Some(preferences) = connection.ssh_algorithms.as_ref() else {
+        return Ok(());
+    };
+
+    crate::core::ssh::validate_ssh_algorithm_preferences(preferences)
 }
 
 fn validate_local_terminal_config(connection: &SavedConnection) -> AppResult<()> {
@@ -235,6 +253,7 @@ mod tests {
                 proxy_jump_id: Some(jump_id.to_string()),
             }),
             post_login: None,
+            ssh_algorithms: None,
             created_at_ms: None,
             updated_at_ms: None,
             last_used_at_ms: None,
@@ -268,6 +287,7 @@ mod tests {
                 proxy_jump_id: Some(jump_id.to_string()),
             }),
             post_login: None,
+            ssh_algorithms: None,
             created_at_ms: None,
             updated_at_ms: None,
             last_used_at_ms: None,
@@ -291,6 +311,7 @@ mod tests {
             auth: None,
             network: None,
             post_login: None,
+            ssh_algorithms: None,
             created_at_ms: None,
             updated_at_ms: None,
             last_used_at_ms: None,

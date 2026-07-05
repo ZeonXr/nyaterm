@@ -178,6 +178,7 @@ pub fn run() {
             cmd::sftp::cancel_transfer,
             cmd::sftp::respond_transfer_duplicate,
             cmd::connection::get_saved_connections,
+            cmd::connection::get_supported_ssh_algorithms,
             cmd::connection::save_connection,
             cmd::connection::delete_connection,
             cmd::connection::get_connection_password_value,

@@ -22,6 +22,29 @@ pub enum AiExecutionProfile {
     Disabled,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SshAlgorithmMode {
+    #[default]
+    Compatible,
+    Secure,
+    Custom,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct SshAlgorithmPreferences {
+    #[serde(default)]
+    pub mode: SshAlgorithmMode,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub kex: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ciphers: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub macs: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub host_keys: Vec<String>,
+}
+
 /// Type-specific configuration for each connection kind.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -220,6 +243,8 @@ pub struct SavedConnection {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub post_login: Option<ConnectionPostLogin>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssh_algorithms: Option<SshAlgorithmPreferences>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub created_at_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub updated_at_ms: Option<u64>,
@@ -375,7 +400,7 @@ pub fn save_config(app: &AppHandle, config: &AppConfig) -> AppResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConnectionType, SavedConnection};
+    use super::{ConnectionType, SavedConnection, SshAlgorithmMode};
 
     #[test]
     fn saved_connection_defaults_missing_post_login_to_none() {
@@ -391,6 +416,23 @@ mod tests {
 
         assert!(matches!(connection.config, ConnectionType::Ssh { .. }));
         assert!(connection.post_login.is_none());
+    }
+
+    #[test]
+    fn saved_connection_defaults_missing_ssh_algorithms_to_compatible_runtime() {
+        let connection: SavedConnection = serde_json::from_value(serde_json::json!({
+            "id": "conn-1",
+            "name": "Test",
+            "type": "ssh",
+            "host": "example.com",
+            "port": 22,
+            "username": "root"
+        }))
+        .expect("connection");
+
+        assert!(matches!(connection.config, ConnectionType::Ssh { .. }));
+        assert!(connection.ssh_algorithms.is_none());
+        assert_eq!(SshAlgorithmMode::default(), SshAlgorithmMode::Compatible);
     }
 
     #[test]

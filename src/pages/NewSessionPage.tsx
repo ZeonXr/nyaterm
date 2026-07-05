@@ -29,12 +29,41 @@ import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
 import { invoke } from "@/lib/invoke";
 import { isValidSerialBaudRate, MAX_SERIAL_BAUD_RATE, MIN_SERIAL_BAUD_RATE } from "@/lib/serial";
-import type { Group, OtpEntry, ProxyConfig, SavedConnection } from "@/types/global";
+import type {
+  Group,
+  OtpEntry,
+  ProxyConfig,
+  SavedConnection,
+  SshAlgorithmPreferences,
+} from "@/types/global";
 
 const isValidPort = (value: number) => Number.isInteger(value) && value >= 1 && value <= 65535;
 const DEFAULT_POST_LOGIN_DELAY_MS = 1000;
 const MIN_POST_LOGIN_DELAY_MS = 0;
 const MAX_POST_LOGIN_DELAY_MS = 60_000;
+const DEFAULT_SSH_ALGORITHMS: SshAlgorithmPreferences = {
+  mode: "compatible",
+  kex: [],
+  ciphers: [],
+  macs: [],
+  host_keys: [],
+};
+
+function normalizeSshAlgorithms(
+  value: SavedConnection["ssh_algorithms"] | undefined,
+): SshAlgorithmPreferences {
+  if (!value) {
+    return { ...DEFAULT_SSH_ALGORITHMS };
+  }
+
+  return {
+    mode: value.mode || "compatible",
+    kex: value.kex || [],
+    ciphers: value.ciphers || [],
+    macs: value.macs || [],
+    host_keys: value.host_keys || [],
+  };
+}
 
 const isValidPostLoginDelay = (value: number) =>
   Number.isInteger(value) && value >= MIN_POST_LOGIN_DELAY_MS && value <= MAX_POST_LOGIN_DELAY_MS;
@@ -92,6 +121,8 @@ export default function NewSessionPage() {
   const [postLoginDelayMs, setPostLoginDelayMs] = useState(DEFAULT_POST_LOGIN_DELAY_MS);
   const [sshBackspaceMode, setSshBackspaceMode] = useState("del");
   const [x11Forwarding, setX11Forwarding] = useState(false);
+  const [sshAlgorithms, setSshAlgorithms] =
+    useState<SshAlgorithmPreferences>(DEFAULT_SSH_ALGORITHMS);
 
   // Serial Settings States
   const [serialPortName, setSerialPortName] = useState("");
@@ -171,6 +202,7 @@ export default function NewSessionPage() {
           setPostLoginDelayMs(found.post_login?.delay_ms ?? DEFAULT_POST_LOGIN_DELAY_MS);
           setSshBackspaceMode(found.backspace_mode || "del");
           setX11Forwarding(found.x11_forwarding ?? false);
+          setSshAlgorithms(normalizeSshAlgorithms(found.ssh_algorithms));
         } else if (found.type === "telnet") {
           setHost(found.host || "");
           setTelnetPort(found.port || 23);
@@ -244,6 +276,7 @@ export default function NewSessionPage() {
     setPostLoginDelayMs(DEFAULT_POST_LOGIN_DELAY_MS);
     setSshBackspaceMode("del");
     setX11Forwarding(false);
+    setSshAlgorithms({ ...DEFAULT_SSH_ALGORITHMS });
     setSerialPortName("");
     setSerialPorts([]);
     setSerialPortsLoading(false);
@@ -584,6 +617,7 @@ export default function NewSessionPage() {
               auth,
               network,
               post_login: postLogin,
+              ssh_algorithms: sshAlgorithms,
               backspace_mode: sshBackspaceMode,
               x11_forwarding: x11Forwarding,
             }
@@ -920,6 +954,8 @@ export default function NewSessionPage() {
               setBackspaceMode={setSshBackspaceMode}
               x11Forwarding={x11Forwarding}
               setX11Forwarding={setX11Forwarding}
+              sshAlgorithms={sshAlgorithms}
+              setSshAlgorithms={setSshAlgorithms}
               connectionId={initialData?.id || editId}
             />
           </TabsContent>

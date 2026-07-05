@@ -1,3 +1,4 @@
+use crate::config::{SshAlgorithmMode, SshAlgorithmPreferences};
 use crate::error::{AppError, AppResult};
 use russh::client;
 use russh::keys::{Algorithm, EcdsaCurve, HashAlg, PublicKeyBase64};
@@ -5,7 +6,9 @@ use russh::{Preferred, cipher, kex, mac};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::process::Stdio;
+use std::str::FromStr;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, BufReader};
@@ -35,6 +38,41 @@ pub struct SshConfig {
     pub proxy_jump: Option<Box<SshConfig>>,
     #[serde(default)]
     pub post_login: Option<SshPostLoginConfig>,
+    #[serde(default)]
+    pub ssh_algorithms: Option<SshAlgorithmPreferences>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AlgorithmRisk {
+    Modern,
+    Legacy,
+    Insecure,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AlgorithmOption {
+    pub id: String,
+    pub label: String,
+    pub risk: AlgorithmRisk,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct SshAlgorithmDefaults {
+    pub kex: Vec<String>,
+    pub ciphers: Vec<String>,
+    pub macs: Vec<String>,
+    pub host_keys: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct SupportedSshAlgorithms {
+    pub kex: Vec<AlgorithmOption>,
+    pub ciphers: Vec<AlgorithmOption>,
+    pub macs: Vec<AlgorithmOption>,
+    pub host_keys: Vec<AlgorithmOption>,
+    pub compatible: SshAlgorithmDefaults,
+    pub secure: SshAlgorithmDefaults,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -225,7 +263,7 @@ fn replace_known_host_entry(host_identifier: &str, new_entry: &str) -> AppResult
     crate::storage::replace_known_host_for_host(host_identifier, new_entry)
 }
 
-fn preferred_algorithms() -> Preferred {
+fn compatible_algorithms() -> Preferred {
     let mut preferred = Preferred::default();
 
     preferred.kex = Cow::Owned(vec![
@@ -296,6 +334,201 @@ fn preferred_algorithms() -> Preferred {
     ]);
 
     preferred
+}
+
+fn secure_algorithms() -> Preferred {
+    Preferred::default()
+}
+
+pub(crate) fn validate_ssh_algorithm_preferences(
+    preferences: &SshAlgorithmPreferences,
+) -> AppResult<()> {
+    resolve_preferred_algorithms(Some(preferences)).map(|_| ())
+}
+
+pub(crate) fn resolve_preferred_algorithms(
+    preferences: Option<&SshAlgorithmPreferences>,
+) -> AppResult<Preferred> {
+    let Some(preferences) = preferences else {
+        return Ok(compatible_algorithms());
+    };
+
+    match preferences.mode {
+        SshAlgorithmMode::Compatible => Ok(compatible_algorithms()),
+        SshAlgorithmMode::Secure => Ok(secure_algorithms()),
+        SshAlgorithmMode::Custom => custom_algorithms(preferences),
+    }
+}
+
+fn custom_algorithms(preferences: &SshAlgorithmPreferences) -> AppResult<Preferred> {
+    let mut preferred = Preferred::default();
+    preferred.kex = Cow::Owned(parse_kex_names(&preferences.kex)?);
+    preferred.cipher = Cow::Owned(parse_cipher_names(&preferences.ciphers)?);
+    preferred.mac = Cow::Owned(parse_mac_names(&preferences.macs)?);
+    preferred.key = Cow::Owned(parse_host_key_algorithms(&preferences.host_keys)?);
+    Ok(preferred)
+}
+
+fn parse_required_list<T, F>(values: &[String], label: &str, mut parse: F) -> AppResult<Vec<T>>
+where
+    F: FnMut(&str) -> Option<T>,
+{
+    if values.is_empty() {
+        return Err(AppError::Config(format!(
+            "SSH algorithm list '{}' must not be empty",
+            label
+        )));
+    }
+
+    values
+        .iter()
+        .map(|value| {
+            parse(value).ok_or_else(|| {
+                AppError::Config(format!(
+                    "Unsupported SSH algorithm '{}' in {}",
+                    value, label
+                ))
+            })
+        })
+        .collect()
+}
+
+fn parse_kex_names(values: &[String]) -> AppResult<Vec<kex::Name>> {
+    parse_required_list(values, "key exchanges", |value| {
+        kex::Name::try_from(value).ok()
+    })
+}
+
+fn parse_cipher_names(values: &[String]) -> AppResult<Vec<cipher::Name>> {
+    parse_required_list(values, "ciphers", |value| {
+        cipher::Name::try_from(value).ok()
+    })
+}
+
+fn parse_mac_names(values: &[String]) -> AppResult<Vec<mac::Name>> {
+    parse_required_list(values, "MACs", |value| mac::Name::try_from(value).ok())
+}
+
+fn parse_host_key_algorithms(values: &[String]) -> AppResult<Vec<Algorithm>> {
+    parse_required_list(values, "host keys", |value| Algorithm::from_str(value).ok())
+}
+
+fn defaults_from_preferred(preferred: Preferred) -> SshAlgorithmDefaults {
+    SshAlgorithmDefaults {
+        kex: preferred
+            .kex
+            .iter()
+            .map(|algorithm| algorithm.as_ref().to_string())
+            .collect(),
+        ciphers: preferred
+            .cipher
+            .iter()
+            .map(|algorithm| algorithm.as_ref().to_string())
+            .collect(),
+        macs: preferred
+            .mac
+            .iter()
+            .map(|algorithm| algorithm.as_ref().to_string())
+            .collect(),
+        host_keys: preferred.key.iter().map(ToString::to_string).collect(),
+    }
+}
+
+fn algorithm_option(id: impl Into<String>, risk: AlgorithmRisk) -> AlgorithmOption {
+    let id = id.into();
+    AlgorithmOption {
+        label: id.clone(),
+        id,
+        risk,
+    }
+}
+
+fn kex_risk(id: &str) -> AlgorithmRisk {
+    match id {
+        "diffie-hellman-group1-sha1"
+        | "diffie-hellman-group14-sha1"
+        | "diffie-hellman-group-exchange-sha1" => AlgorithmRisk::Insecure,
+        value if value.starts_with("diffie-hellman-") => AlgorithmRisk::Legacy,
+        _ => AlgorithmRisk::Modern,
+    }
+}
+
+fn cipher_risk(id: &str) -> AlgorithmRisk {
+    match id {
+        "3des-cbc" => AlgorithmRisk::Insecure,
+        value if value.ends_with("-cbc") => AlgorithmRisk::Legacy,
+        _ => AlgorithmRisk::Modern,
+    }
+}
+
+fn mac_risk(id: &str) -> AlgorithmRisk {
+    match id {
+        "hmac-sha1" => AlgorithmRisk::Insecure,
+        "hmac-sha1-etm@openssh.com" => AlgorithmRisk::Legacy,
+        _ => AlgorithmRisk::Modern,
+    }
+}
+
+fn host_key_risk(id: &str) -> AlgorithmRisk {
+    match id {
+        "ssh-dss" => AlgorithmRisk::Insecure,
+        "ssh-rsa" => AlgorithmRisk::Legacy,
+        _ => AlgorithmRisk::Modern,
+    }
+}
+
+pub fn get_supported_ssh_algorithms() -> SupportedSshAlgorithms {
+    let compatible = defaults_from_preferred(compatible_algorithms());
+    let secure = defaults_from_preferred(secure_algorithms());
+
+    let mut kex_ids = compatible.kex.clone();
+    for id in &secure.kex {
+        if !kex_ids.contains(id) {
+            kex_ids.push(id.clone());
+        }
+    }
+
+    let mut cipher_ids = compatible.ciphers.clone();
+    for id in &secure.ciphers {
+        if !cipher_ids.contains(id) {
+            cipher_ids.push(id.clone());
+        }
+    }
+
+    let mut mac_ids = compatible.macs.clone();
+    for id in &secure.macs {
+        if !mac_ids.contains(id) {
+            mac_ids.push(id.clone());
+        }
+    }
+
+    let mut host_key_ids = compatible.host_keys.clone();
+    for id in &secure.host_keys {
+        if !host_key_ids.contains(id) {
+            host_key_ids.push(id.clone());
+        }
+    }
+
+    SupportedSshAlgorithms {
+        kex: kex_ids
+            .into_iter()
+            .map(|id| algorithm_option(id.clone(), kex_risk(&id)))
+            .collect(),
+        ciphers: cipher_ids
+            .into_iter()
+            .map(|id| algorithm_option(id.clone(), cipher_risk(&id)))
+            .collect(),
+        macs: mac_ids
+            .into_iter()
+            .map(|id| algorithm_option(id.clone(), mac_risk(&id)))
+            .collect(),
+        host_keys: host_key_ids
+            .into_iter()
+            .map(|id| algorithm_option(id.clone(), host_key_risk(&id)))
+            .collect(),
+        compatible,
+        secure,
+    }
 }
 
 impl client::Handler for SshHandler {
@@ -543,14 +776,17 @@ impl client::Handler for SshHandler {
     }
 }
 
-pub(super) fn build_client_config(app: &AppHandle) -> client::Config {
+pub(super) fn build_client_config(
+    app: &AppHandle,
+    config: &SshConfig,
+) -> AppResult<client::Config> {
     let mut client_cfg = client::Config {
         window_size: 32 * 1024 * 1024,
         maximum_packet_size: 32 * 1024,
         nodelay: true,
         inactivity_timeout: None,
         keepalive_max: 3,
-        preferred: preferred_algorithms(),
+        preferred: resolve_preferred_algorithms(config.ssh_algorithms.as_ref())?,
         ..Default::default()
     };
 
@@ -565,15 +801,16 @@ pub(super) fn build_client_config(app: &AppHandle) -> client::Config {
         }
     }
 
-    client_cfg
+    Ok(client_cfg)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        KnownHostCheck, check_known_host_entry, expand_proxy_command, preferred_algorithms,
-        shell_quote,
+        KnownHostCheck, check_known_host_entry, compatible_algorithms, expand_proxy_command,
+        get_supported_ssh_algorithms, resolve_preferred_algorithms, secure_algorithms, shell_quote,
     };
+    use crate::config::{SshAlgorithmMode, SshAlgorithmPreferences};
     use russh::keys::{Algorithm, EcdsaCurve};
     use russh::{cipher, kex, mac};
 
@@ -602,7 +839,7 @@ example.com ssh-rsa AAAARSA
 
     #[test]
     fn preferred_algorithms_include_legacy_fallbacks() {
-        let preferred = preferred_algorithms();
+        let preferred = compatible_algorithms();
 
         assert!(preferred.cipher.contains(&cipher::AES_128_CBC));
         assert!(preferred.cipher.contains(&cipher::TRIPLE_DES_CBC));
@@ -630,6 +867,109 @@ example.com ssh-rsa AAAARSA
             })
             .expect("P-521 ECDSA is enabled");
         assert!(rsa_sha1_index < ecdsa_p521_index);
+    }
+
+    #[test]
+    fn secure_algorithms_exclude_legacy_fallbacks() {
+        let preferred = secure_algorithms();
+
+        assert!(!preferred.cipher.contains(&cipher::AES_128_CBC));
+        assert!(!preferred.cipher.contains(&cipher::TRIPLE_DES_CBC));
+        assert!(!preferred.kex.contains(&kex::DH_GEX_SHA1));
+        assert!(!preferred.kex.contains(&kex::DH_G1_SHA1));
+        assert!(!preferred.mac.contains(&mac::HMAC_SHA1));
+        assert!(!preferred.key.contains(&Algorithm::Dsa));
+    }
+
+    #[test]
+    fn missing_algorithm_preferences_default_to_compatible() {
+        let preferred = resolve_preferred_algorithms(None).expect("resolve defaults");
+
+        assert!(preferred.cipher.contains(&cipher::TRIPLE_DES_CBC));
+        assert!(preferred.kex.contains(&kex::DH_G1_SHA1));
+    }
+
+    #[test]
+    fn custom_algorithm_preferences_preserve_order() {
+        let preferences = SshAlgorithmPreferences {
+            mode: SshAlgorithmMode::Custom,
+            kex: vec![
+                kex::CURVE25519_PRE_RFC_8731.as_ref().to_string(),
+                kex::CURVE25519.as_ref().to_string(),
+            ],
+            ciphers: vec![
+                cipher::AES_128_CTR.as_ref().to_string(),
+                cipher::AES_256_CTR.as_ref().to_string(),
+            ],
+            macs: vec![
+                mac::HMAC_SHA256.as_ref().to_string(),
+                mac::HMAC_SHA512.as_ref().to_string(),
+            ],
+            host_keys: vec![
+                Algorithm::Rsa { hash: None }.to_string(),
+                Algorithm::Ed25519.to_string(),
+            ],
+        };
+
+        let preferred =
+            resolve_preferred_algorithms(Some(&preferences)).expect("resolve custom algorithms");
+
+        assert_eq!(preferred.kex[0], kex::CURVE25519_PRE_RFC_8731);
+        assert_eq!(preferred.kex[1], kex::CURVE25519);
+        assert_eq!(preferred.cipher[0], cipher::AES_128_CTR);
+        assert_eq!(preferred.cipher[1], cipher::AES_256_CTR);
+        assert_eq!(preferred.mac[0], mac::HMAC_SHA256);
+        assert_eq!(preferred.mac[1], mac::HMAC_SHA512);
+        assert_eq!(preferred.key[0], Algorithm::Rsa { hash: None });
+        assert_eq!(preferred.key[1], Algorithm::Ed25519);
+    }
+
+    #[test]
+    fn custom_algorithm_preferences_reject_empty_lists() {
+        let preferences = SshAlgorithmPreferences {
+            mode: SshAlgorithmMode::Custom,
+            kex: Vec::new(),
+            ciphers: vec![cipher::AES_128_CTR.as_ref().to_string()],
+            macs: vec![mac::HMAC_SHA256.as_ref().to_string()],
+            host_keys: vec![Algorithm::Ed25519.to_string()],
+        };
+
+        let error = resolve_preferred_algorithms(Some(&preferences)).unwrap_err();
+        assert!(error.to_string().contains("must not be empty"));
+    }
+
+    #[test]
+    fn custom_algorithm_preferences_reject_unknown_algorithms() {
+        let preferences = SshAlgorithmPreferences {
+            mode: SshAlgorithmMode::Custom,
+            kex: vec!["not-a-kex".to_string()],
+            ciphers: vec![cipher::AES_128_CTR.as_ref().to_string()],
+            macs: vec![mac::HMAC_SHA256.as_ref().to_string()],
+            host_keys: vec![Algorithm::Ed25519.to_string()],
+        };
+
+        let error = resolve_preferred_algorithms(Some(&preferences)).unwrap_err();
+        assert!(error.to_string().contains("Unsupported SSH algorithm"));
+    }
+
+    #[test]
+    fn supported_algorithms_include_current_feature_fallbacks() {
+        let supported = get_supported_ssh_algorithms();
+
+        assert!(supported.ciphers.iter().any(|item| item.id == "3des-cbc"));
+        assert!(supported.host_keys.iter().any(|item| item.id == "ssh-dss"));
+        assert!(
+            supported
+                .compatible
+                .kex
+                .contains(&"diffie-hellman-group1-sha1".to_string())
+        );
+        assert!(
+            !supported
+                .secure
+                .kex
+                .contains(&"diffie-hellman-group1-sha1".to_string())
+        );
     }
 
     #[test]

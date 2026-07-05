@@ -22,7 +22,6 @@ async fn create_authenticated_connection(
     SshHandle,
     Option<mpsc::UnboundedReceiver<super::x11_forwarding::X11ChannelOpen>>,
 )> {
-    let ssh_client_config = Arc::new(build_client_config(app));
     let (x11_tx, x11_rx) = if config.x11_forwarding {
         let (tx, rx) = mpsc::unbounded_channel();
         (Some(tx), Some(rx))
@@ -30,8 +29,7 @@ async fn create_authenticated_connection(
         (None, None)
     };
 
-    let (target_handle, jumps) =
-        connect_authenticated_chain(app, config, ssh_client_config, x11_tx).await?;
+    let (target_handle, jumps) = connect_authenticated_chain(app, config, x11_tx).await?;
     Ok((
         Arc::new(SshConnectionHandles::new(target_handle, jumps)),
         x11_rx,
@@ -41,16 +39,14 @@ async fn create_authenticated_connection(
 async fn connect_authenticated_chain(
     app: &AppHandle,
     config: &SshConfig,
-    ssh_client_config: Arc<russh::client::Config>,
     x11_tx: Option<mpsc::UnboundedSender<super::x11_forwarding::X11ChannelOpen>>,
 ) -> AppResult<(SshRawHandle, Vec<SshRawHandle>)> {
-    connect_authenticated_chain_boxed(app, config, ssh_client_config, x11_tx).await
+    connect_authenticated_chain_boxed(app, config, x11_tx).await
 }
 
 fn connect_authenticated_chain_boxed<'a>(
     app: &'a AppHandle,
     config: &'a SshConfig,
-    ssh_client_config: Arc<russh::client::Config>,
     x11_tx: Option<mpsc::UnboundedSender<super::x11_forwarding::X11ChannelOpen>>,
 ) -> Pin<Box<dyn Future<Output = AppResult<(SshRawHandle, Vec<SshRawHandle>)>> + Send + 'a>> {
     Box::pin(async move {
@@ -64,8 +60,7 @@ fn connect_authenticated_chain_boxed<'a>(
             );
 
             let (jump_handle, mut jumps) =
-                connect_authenticated_chain(app, jump_config, ssh_client_config.clone(), None)
-                    .await?;
+                connect_authenticated_chain(app, jump_config, None).await?;
             let channel = {
                 let jump = jump_handle.lock().await;
                 jump.channel_open_direct_tcpip(&config.host, config.port.into(), "127.0.0.1", 0)
@@ -91,6 +86,7 @@ fn connect_authenticated_chain_boxed<'a>(
             if let Some(tx) = x11_tx {
                 target_handler = target_handler.with_x11_sender(tx);
             }
+            let ssh_client_config = Arc::new(build_client_config(app, config)?);
             let mut target_handle =
                 connect_via_stream(channel.into_stream(), ssh_client_config, target_handler)
                     .await?;
@@ -122,6 +118,7 @@ fn connect_authenticated_chain_boxed<'a>(
         if let Some(tx) = x11_tx {
             handler = handler.with_x11_sender(tx);
         }
+        let ssh_client_config = Arc::new(build_client_config(app, config)?);
         let mut handle = connect_with_proxy(config, ssh_client_config, handler).await?;
         authenticate_handle(
             &mut handle,

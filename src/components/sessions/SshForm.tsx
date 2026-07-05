@@ -2,11 +2,20 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ChevronsUpDownIcon, Eye, EyeOff } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { MdCheck, MdChevronRight, MdClose, MdExpandMore, MdSettings } from "react-icons/md";
+import {
+  MdCheck,
+  MdChevronRight,
+  MdClose,
+  MdExpandMore,
+  MdKeyboardArrowDown,
+  MdKeyboardArrowUp,
+  MdSettings,
+} from "react-icons/md";
 import { ConnectionCombobox, type ConnectionOption } from "@/components/dialog/network/shared";
 import { KeyManagementTab } from "@/components/panel/security-auth/KeyManagementTab";
 import { PasswordManagementTab } from "@/components/panel/security-auth/PasswordManagementTab";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Command,
@@ -39,7 +48,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { invoke } from "@/lib/invoke";
 import { cn } from "@/lib/utils";
-import type { OtpEntry, ProxyConfig, SavedPassword, SshKey } from "@/types/global";
+import type {
+  AlgorithmOption,
+  OtpEntry,
+  ProxyConfig,
+  SavedPassword,
+  SshAlgorithmDefaults,
+  SshAlgorithmPreferences,
+  SshKey,
+  SupportedSshAlgorithms,
+} from "@/types/global";
 
 const MASKED_PASSWORD_PLACEHOLDER = "••••••••";
 export type SshAuthMode = "none" | "password" | "key";
@@ -85,6 +103,8 @@ interface SshFormProps {
   setBackspaceMode: (v: string) => void;
   x11Forwarding: boolean;
   setX11Forwarding: (v: boolean) => void;
+  sshAlgorithms: SshAlgorithmPreferences;
+  setSshAlgorithms: (v: SshAlgorithmPreferences) => void;
   connectionId?: string;
 }
 
@@ -223,6 +243,141 @@ function formatOtpSubtitle(entry: OtpEntry) {
     .join(" · ");
 }
 
+function emptyAlgorithmPreferences(mode: SshAlgorithmPreferences["mode"]): SshAlgorithmPreferences {
+  return {
+    mode,
+    kex: [],
+    ciphers: [],
+    macs: [],
+    host_keys: [],
+  };
+}
+
+function withDefaultAlgorithms(
+  value: SshAlgorithmPreferences,
+  defaults: SshAlgorithmDefaults,
+): SshAlgorithmPreferences {
+  return {
+    mode: value.mode,
+    kex: value.kex.length > 0 ? value.kex : defaults.kex,
+    ciphers: value.ciphers.length > 0 ? value.ciphers : defaults.ciphers,
+    macs: value.macs.length > 0 ? value.macs : defaults.macs,
+    host_keys: value.host_keys.length > 0 ? value.host_keys : defaults.host_keys,
+  };
+}
+
+function riskLabel(risk: AlgorithmOption["risk"], t: ReturnType<typeof useTranslation>["t"]) {
+  if (risk === "insecure") return t("dialog.algorithmRiskInsecure");
+  if (risk === "legacy") return t("dialog.algorithmRiskLegacy");
+  return t("dialog.algorithmRiskModern");
+}
+
+function riskClassName(risk: AlgorithmOption["risk"]) {
+  if (risk === "insecure") {
+    return "border-destructive/40 bg-destructive/10 text-destructive";
+  }
+  if (risk === "legacy") {
+    return "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300";
+  }
+  return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+}
+
+function moveItem(items: string[], index: number, direction: -1 | 1) {
+  const nextIndex = index + direction;
+  if (nextIndex < 0 || nextIndex >= items.length) return items;
+  const next = [...items];
+  [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+  return next;
+}
+
+function AlgorithmOrderList({
+  options,
+  value,
+  onChange,
+}: {
+  options: AlgorithmOption[];
+  value: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const { t } = useTranslation();
+  const selected = new Set(value);
+  const optionById = new Map(options.map((option) => [option.id, option]));
+  const rows = [
+    ...value
+      .map((id) => optionById.get(id))
+      .filter((option): option is AlgorithmOption => Boolean(option)),
+    ...options.filter((option) => !selected.has(option.id)),
+  ];
+
+  return (
+    <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
+      {rows.map((option) => {
+        const enabled = selected.has(option.id);
+        const enabledIndex = value.indexOf(option.id);
+        const isLastEnabled = enabled && value.length <= 1;
+        return (
+          <div
+            key={option.id}
+            className={cn(
+              "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md border px-2 py-1.5",
+              enabled ? "bg-accent/50" : "bg-muted/20 opacity-70",
+            )}
+          >
+            <Checkbox
+              className="size-3.5"
+              checked={enabled}
+              disabled={isLastEnabled}
+              onCheckedChange={(checked) => {
+                if (checked === true) {
+                  onChange([...value, option.id]);
+                } else {
+                  onChange(value.filter((id) => id !== option.id));
+                }
+              }}
+              aria-label={option.label}
+            />
+            <div className="min-w-0">
+              <div className="truncate font-mono text-[0.6875rem]">{option.label}</div>
+              <span
+                className={cn(
+                  "mt-0.5 inline-flex rounded border px-1.5 py-0.5 text-[0.5625rem] leading-none",
+                  riskClassName(option.risk),
+                )}
+              >
+                {riskLabel(option.risk, t)}
+              </span>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={!enabled || enabledIndex <= 0}
+                onClick={() => onChange(moveItem(value, enabledIndex, -1))}
+                title={t("dialog.moveUp")}
+              >
+                <MdKeyboardArrowUp className="text-sm" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                disabled={!enabled || enabledIndex < 0 || enabledIndex >= value.length - 1}
+                onClick={() => onChange(moveItem(value, enabledIndex, 1))}
+                title={t("dialog.moveDown")}
+              >
+                <MdKeyboardArrowDown className="text-sm" />
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SshForm({
   host,
   setHost,
@@ -263,6 +418,8 @@ export function SshForm({
   setBackspaceMode,
   x11Forwarding,
   setX11Forwarding,
+  sshAlgorithms,
+  setSshAlgorithms,
   connectionId,
 }: SshFormProps) {
   const { t } = useTranslation();
@@ -275,6 +432,9 @@ export function SshForm({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [showDirectPassword, setShowDirectPassword] = useState(false);
   const [directPasswordLoading, setDirectPasswordLoading] = useState(false);
+  const [supportedAlgorithms, setSupportedAlgorithms] = useState<SupportedSshAlgorithms | null>(
+    null,
+  );
   const [passwordSource, setPasswordSource] = useState<PasswordSource>(
     passwordId ? "saved" : password || hasPassword ? "direct" : "ask",
   );
@@ -330,6 +490,27 @@ export function SshForm({
     };
   }, [loadSshKeys, loadPasswords]);
 
+  useEffect(() => {
+    invoke<SupportedSshAlgorithms>("get_supported_ssh_algorithms")
+      .then(setSupportedAlgorithms)
+      .catch(() => {
+        /* ignore */
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!supportedAlgorithms || sshAlgorithms.mode !== "custom") return;
+    const next = withDefaultAlgorithms(sshAlgorithms, supportedAlgorithms.compatible);
+    if (
+      next.kex !== sshAlgorithms.kex ||
+      next.ciphers !== sshAlgorithms.ciphers ||
+      next.macs !== sshAlgorithms.macs ||
+      next.host_keys !== sshAlgorithms.host_keys
+    ) {
+      setSshAlgorithms(next);
+    }
+  }, [setSshAlgorithms, sshAlgorithms, supportedAlgorithms]);
+
   const selectedKeyName = sshKeys.find((k) => k.id === keyId)?.name;
   const selectedPasswordName = savedPasswords.find((p) => p.id === passwordId)?.name;
   const selectedProxy = proxies.find((proxy) => proxy.id === proxyId);
@@ -351,6 +532,25 @@ export function SshForm({
       .join(" "),
     subtitle: formatOtpSubtitle(entry),
   }));
+  const setAlgorithmMode = (mode: SshAlgorithmPreferences["mode"]) => {
+    if (mode === "custom" && supportedAlgorithms) {
+      setSshAlgorithms(
+        withDefaultAlgorithms({ ...sshAlgorithms, mode }, supportedAlgorithms.compatible),
+      );
+      return;
+    }
+    setSshAlgorithms(emptyAlgorithmPreferences(mode));
+  };
+  const setAlgorithmList = (
+    key: keyof Pick<SshAlgorithmPreferences, "kex" | "ciphers" | "macs" | "host_keys">,
+    value: string[],
+  ) => {
+    setSshAlgorithms({
+      ...sshAlgorithms,
+      mode: "custom",
+      [key]: value,
+    });
+  };
 
   const toggleDirectPasswordVisibility = async () => {
     if (showDirectPassword) {
@@ -952,6 +1152,92 @@ export function SshForm({
               </div>
             </TabsContent>
           </Tabs>
+          <div className="rounded-lg border bg-accent/25 p-3">
+            <div className="space-y-0.5">
+              <div className="text-xs font-medium">{t("dialog.sshAlgorithms")}</div>
+              <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
+                {t("dialog.sshAlgorithmsDesc")}
+              </p>
+            </div>
+            <div className="mt-3 max-w-xs">
+              <Label className="text-xs font-medium text-foreground/80">
+                {t("dialog.algorithmMode")}
+              </Label>
+              <Select
+                value={sshAlgorithms.mode}
+                onValueChange={(value) =>
+                  setAlgorithmMode(value as SshAlgorithmPreferences["mode"])
+                }
+              >
+                <SelectTrigger className="mt-1 h-8 text-xs font-normal">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="compatible">{t("dialog.algorithmModeCompatible")}</SelectItem>
+                  <SelectItem value="secure">{t("dialog.algorithmModeSecure")}</SelectItem>
+                  <SelectItem value="custom">{t("dialog.algorithmModeCustom")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="mt-2 text-[0.6875rem] leading-relaxed text-muted-foreground">
+              {sshAlgorithms.mode === "secure"
+                ? t("dialog.algorithmModeSecureDesc")
+                : sshAlgorithms.mode === "custom"
+                  ? t("dialog.algorithmModeCustomDesc")
+                  : t("dialog.algorithmModeCompatibleDesc")}
+            </p>
+            {sshAlgorithms.mode === "custom" && supportedAlgorithms && (
+              <Tabs defaultValue="kex" className="mt-3 w-full">
+                <TabsList className="grid h-8 w-full grid-cols-4 pointer-events-auto">
+                  <TabsTrigger value="kex" className="min-w-0 px-1 text-[0.6875rem]">
+                    <span className="truncate">{t("dialog.algorithmKexTab")}</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="ciphers" className="min-w-0 px-1 text-[0.6875rem]">
+                    <span className="truncate">{t("dialog.algorithmCiphersTab")}</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="macs" className="min-w-0 px-1 text-[0.6875rem]">
+                    <span className="truncate">{t("dialog.algorithmMacsTab")}</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="host-keys" className="min-w-0 px-1 text-[0.6875rem]">
+                    <span className="truncate">{t("dialog.algorithmHostKeysTab")}</span>
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="kex" className="mt-1 border-0 outline-none">
+                  <AlgorithmOrderList
+                    options={supportedAlgorithms.kex}
+                    value={sshAlgorithms.kex}
+                    onChange={(value) => setAlgorithmList("kex", value)}
+                  />
+                </TabsContent>
+                <TabsContent value="ciphers" className="mt-1 border-0 outline-none">
+                  <AlgorithmOrderList
+                    options={supportedAlgorithms.ciphers}
+                    value={sshAlgorithms.ciphers}
+                    onChange={(value) => setAlgorithmList("ciphers", value)}
+                  />
+                </TabsContent>
+                <TabsContent value="macs" className="mt-1 border-0 outline-none">
+                  <AlgorithmOrderList
+                    options={supportedAlgorithms.macs}
+                    value={sshAlgorithms.macs}
+                    onChange={(value) => setAlgorithmList("macs", value)}
+                  />
+                </TabsContent>
+                <TabsContent value="host-keys" className="mt-1 border-0 outline-none">
+                  <AlgorithmOrderList
+                    options={supportedAlgorithms.host_keys}
+                    value={sshAlgorithms.host_keys}
+                    onChange={(value) => setAlgorithmList("host_keys", value)}
+                  />
+                </TabsContent>
+              </Tabs>
+            )}
+            {sshAlgorithms.mode === "custom" && !supportedAlgorithms && (
+              <div className="mt-3 rounded-md border border-dashed bg-background/70 px-3 py-2 text-[0.6875rem] text-muted-foreground">
+                {t("dialog.algorithmLoading")}
+              </div>
+            )}
+          </div>
         </CollapsibleContent>
       </Collapsible>
 

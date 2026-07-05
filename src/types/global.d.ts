@@ -102,6 +102,7 @@ export interface SshConfig {
   proxy?: ProxySettings | null;
   proxy_jump?: SshConfig | null;
   post_login?: { command: string; delay_ms: number } | null;
+  ssh_algorithms?: SshAlgorithmPreferences | null;
 }
 
 /** SSH authentication: none, password, or private key (PEM content). */
@@ -188,6 +189,40 @@ export interface ConnectionPostLogin {
   delay_ms: number;
 }
 
+export type SshAlgorithmMode = "compatible" | "secure" | "custom";
+
+export interface SshAlgorithmPreferences {
+  mode: SshAlgorithmMode;
+  kex: string[];
+  ciphers: string[];
+  macs: string[];
+  host_keys: string[];
+}
+
+export type AlgorithmRisk = "modern" | "legacy" | "insecure";
+
+export interface AlgorithmOption {
+  id: string;
+  label: string;
+  risk: AlgorithmRisk;
+}
+
+export interface SshAlgorithmDefaults {
+  kex: string[];
+  ciphers: string[];
+  macs: string[];
+  host_keys: string[];
+}
+
+export interface SupportedSshAlgorithms {
+  kex: AlgorithmOption[];
+  ciphers: AlgorithmOption[];
+  macs: AlgorithmOption[];
+  host_keys: AlgorithmOption[];
+  compatible: SshAlgorithmDefaults;
+  secure: SshAlgorithmDefaults;
+}
+
 /** Unified saved connection with type-discriminated config. */
 export interface SavedConnection {
   id: string;
@@ -201,6 +236,7 @@ export interface SavedConnection {
   auth?: ConnectionAuth;
   network?: ConnectionNetwork;
   post_login?: ConnectionPostLogin;
+  ssh_algorithms?: SshAlgorithmPreferences;
   /** SSH-specific fields (present when type === "ssh"). */
   host?: string;
   port?: number;

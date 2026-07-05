@@ -117,6 +117,7 @@ fn normalize_temporary_ssh_config(mut config: ssh::SshConfig) -> ssh::SshConfig 
     config.proxy = None;
     config.proxy_jump = None;
     config.post_login = None;
+    config.ssh_algorithms = None;
     config
 }
 
