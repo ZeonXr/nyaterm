@@ -1,5 +1,5 @@
 use crate::core::SessionManager;
-use crate::core::process::{
+use crate::core::monitoring::process::{
     PROCESS_LIST_SCRIPT, PROCESS_LIST_UNSUPPORTED_ERROR, RemoteProcess,
     is_process_list_unsupported, parse_process_output,
 };

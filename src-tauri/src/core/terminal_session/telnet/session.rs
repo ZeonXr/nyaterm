@@ -1,0 +1,388 @@
+async fn telnet_session_task(
+    app: AppHandle,
+    session_id: String,
+    manager: Arc<SessionManager>,
+    mut cmd_rx: mpsc::UnboundedReceiver<SessionCommand>,
+    config: TelnetSessionConfig,
+    connection_id: Option<String>,
+) {
+    let backspace_as_bs = config.backspace_mode == "ctrl_h";
+    let host = config.host.clone();
+    let port = config.port;
+    let addr = format!("{}:{}", host, port);
+    let stream = match TcpStream::connect(&addr).await {
+        Ok(s) => s,
+        Err(e) => {
+            log_event(StructuredLog {
+                level: StructuredLogLevel::Error,
+                domain: "session.lifecycle".to_string(),
+                event: "session.connection_failed".to_string(),
+                message: "Telnet connection failed".to_string(),
+                ids: Some(serde_json::json!({
+                    "session_id": session_id.clone(),
+                    "connection_id": connection_id.clone(),
+                })),
+                data: Some(serde_json::json!({
+                    "session_type": "Telnet",
+                    "host": host,
+                    "port": port,
+                })),
+                error: Some(serde_json::json!({ "message": e.to_string() })),
+                client_timestamp: None,
+            });
+            let _ = app.emit(
+                &format!("session-error-{}", session_id),
+                format!("Connection failed: {}", e),
+            );
+            let _ = app.emit(&format!("session-closed-{}", session_id), ());
+            manager.remove_session(&session_id).await;
+            return;
+        }
+    };
+
+    let (mut reader, mut writer) = stream.into_split();
+    let output_event = format!("terminal-output-{}", session_id);
+    let closed_event = format!("session-closed-{}", session_id);
+    let recording_mgr: Option<Arc<RecordingManager>> = app
+        .try_state::<Arc<RecordingManager>>()
+        .map(|state| state.inner().clone());
+    let output = SessionOutputCoalescer::for_app(app.clone(), output_event.clone());
+
+    let capture_processor = Arc::new(TokioMutex::new(OutputCaptureProcessor::new()));
+    let capture_for_reader = capture_processor.clone();
+
+    let zmodem_state: Arc<TokioMutex<Option<ZmodemTransfer>>> = Arc::new(TokioMutex::new(None));
+    let zmodem_state_reader = zmodem_state.clone();
+    let zmodem_event_name = format!("zmodem-event-{session_id}");
+    let zmodem_event_reader = zmodem_event_name.clone();
+    let (zmodem_out_tx, mut zmodem_out_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+
+    let app_reader = app.clone();
+    let sid_reader = session_id.clone();
+    let manager_reader = manager.clone();
+    let output_reader = output.clone();
+    let reader_connection_id = connection_id.clone();
+    let recording_mgr_reader = recording_mgr.clone();
+    let (pause_tx, mut pause_rx) = tokio::sync::watch::channel(false);
+
+    let (negotiate_tx, mut negotiate_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+    let (reader_done_tx, mut reader_done_rx) = mpsc::unbounded_channel::<()>();
+
+    let reader_config = config.clone();
+    let reader_handle = tokio::spawn(async move {
+        let mut buf = [0u8; 4096];
+        let mut zmodem_detector = ZmodemDetector::new();
+        'reader: loop {
+            while *pause_rx.borrow() {
+                if pause_rx.changed().await.is_err() {
+                    break 'reader;
+                }
+            }
+            match reader.read(&mut buf).await {
+                Ok(0) => break,
+                Ok(n) => {
+                    let visible = if reader_config.raw_tcp_cli {
+                        unescape_iac_iac(&buf[..n])
+                    } else {
+                        let neg_tx = negotiate_tx.clone();
+                        strip_telnet_commands(&buf[..n], &mut |cmd, opt| {
+                            let resp = negotiate_response(
+                                cmd,
+                                opt,
+                                reader_config.send_naws,
+                                reader_config.send_sga,
+                            );
+                            if !resp.is_empty() {
+                                let _ = neg_tx.send(resp);
+                            }
+                        })
+                    };
+                    if visible.is_empty() {
+                        continue;
+                    }
+
+                    // ZMODEM: if active, route to transfer.
+                    {
+                        let mut zm = zmodem_state_reader.lock().await;
+                        if let Some(ref mut transfer) = *zm {
+                            let actions = transfer.feed_incoming(&visible);
+                            for action in actions {
+                                match action {
+                                    ZmodemAction::SendToRemote(data) => {
+                                        let _ = zmodem_out_tx.send(data);
+                                    }
+                                    ZmodemAction::EmitEvent(event) => {
+                                        let _ = app_reader.emit(&zmodem_event_reader, &event);
+                                    }
+                                }
+                            }
+                            if transfer.is_done() {
+                                *zm = None;
+                                zmodem_detector.reset();
+                            }
+                            continue;
+                        }
+                    }
+
+                    // ZMODEM: detect header.
+                    let process_visible = match zmodem_detector.feed(&visible) {
+                        ZmodemDetectResult::Detected {
+                            direction,
+                            passthrough,
+                            initial_bytes,
+                        } => {
+                            if !passthrough.is_empty() {
+                                let pre = String::from_utf8_lossy(&passthrough).to_string();
+                                if !pre.is_empty() {
+                                    if let Some(ref recorder) = recording_mgr_reader {
+                                        recorder.write_output(&sid_reader, &pre);
+                                    }
+                                    output_reader.push_owned(pre);
+                                }
+                            }
+                            let prepared_upload = if direction == ZmodemDirection::Upload {
+                                manager_reader.take_pending_zmodem_upload(&sid_reader).await
+                            } else {
+                                None
+                            };
+                            let (transfer, bootstrap_actions) =
+                                start_zmodem_transfer(direction, &initial_bytes, prepared_upload);
+                            for action in bootstrap_actions {
+                                match action {
+                                    ZmodemAction::SendToRemote(data) => {
+                                        let _ = zmodem_out_tx.send(data);
+                                    }
+                                    ZmodemAction::EmitEvent(event) => {
+                                        let _ = app_reader.emit(&zmodem_event_reader, &event);
+                                    }
+                                }
+                            }
+                            *zmodem_state_reader.lock().await = Some(transfer);
+                            let _ = app_reader
+                                .emit(&zmodem_event_reader, &ZmodemEvent::Detected { direction });
+                            continue;
+                        }
+                        ZmodemDetectResult::NoMatch { passthrough } => {
+                            if passthrough.is_empty() {
+                                continue;
+                            }
+                            passthrough
+                        }
+                    };
+
+                    let mut text = String::from_utf8_lossy(&process_visible).to_string();
+                    let mut proc = capture_for_reader.lock().await;
+                    if proc.has_active() {
+                        text = proc.process(&text);
+                    }
+                    drop(proc);
+                    if !text.is_empty() {
+                        if let Some(ref recorder) = recording_mgr_reader {
+                            recorder.write_output(&sid_reader, &text);
+                        }
+                        output_reader.push_owned(text);
+                    }
+                }
+                Err(e) => {
+                    log_rate_limited(StructuredLog {
+                        level: StructuredLogLevel::Warn,
+                        domain: "session.lifecycle".to_string(),
+                        event: "telnet.read_error".to_string(),
+                        message: "Telnet read error".to_string(),
+                        ids: Some(serde_json::json!({
+                            "session_id": sid_reader.clone(),
+                            "connection_id": reader_connection_id.clone(),
+                        })),
+                        data: Some(serde_json::json!({
+                            "session_type": "Telnet",
+                        })),
+                        error: Some(serde_json::json!({ "message": e.to_string() })),
+                        client_timestamp: None,
+                    });
+                    break;
+                }
+            }
+        }
+        output_reader.close();
+        let _ = reader_done_tx.send(());
+    });
+
+    let line_edit_active = config.raw_tcp_cli && config.local_line_edit;
+    let mut line_editor = TelnetLineEditor::default();
+
+    loop {
+        tokio::select! {
+            Some(neg_data) = negotiate_rx.recv() => {
+                if let Err(e) = writer.write_all(&neg_data).await {
+                    log_rate_limited(StructuredLog {
+                        level: StructuredLogLevel::Warn,
+                        domain: "session.lifecycle".to_string(),
+                        event: "telnet.negotiate_write_error".to_string(),
+                        message: "Telnet negotiate write error".to_string(),
+                        ids: Some(serde_json::json!({
+                            "session_id": session_id.clone(),
+                            "connection_id": connection_id.clone(),
+                        })),
+                        data: Some(serde_json::json!({
+                            "session_type": "Telnet",
+                        })),
+                        error: Some(serde_json::json!({ "message": e.to_string() })),
+                        client_timestamp: None,
+                    });
+                    break;
+                }
+            }
+            Some(zdata) = zmodem_out_rx.recv() => {
+                let _ = writer.write_all(&zdata).await;
+            }
+            reader_done = reader_done_rx.recv() => {
+                let _ = reader_done;
+                break;
+            }
+            cmd = cmd_rx.recv() => {
+                match cmd {
+                    Some(SessionCommand::Attach) => {
+                        output.attach();
+                    }
+                    Some(SessionCommand::Write(mut data)) => {
+                        if zmodem_state.lock().await.is_some() {
+                            continue;
+                        }
+
+                        let mut write_failed = None;
+                        if line_edit_active {
+                            let edit_result = line_editor.process(&data, config.enter_mode);
+                            if !edit_result.display.is_empty() {
+                                output.push_owned(edit_result.display);
+                            }
+
+                            for data in edit_result.writes {
+                                if let Some(ref recorder) = recording_mgr {
+                                    recorder.write_input(&session_id, &data);
+                                }
+                                if let Err(e) = writer.write_all(&data).await {
+                                    write_failed = Some(e);
+                                    break;
+                                }
+                            }
+                        } else {
+                            if backspace_as_bs {
+                                remap_del_to_bs(&mut data);
+                            }
+                            let data = normalize_enter_bytes(&data, config.enter_mode);
+                            if config.local_echo {
+                                let echoed = local_echo_text(&data);
+                                if !echoed.is_empty() {
+                                    output.push_owned(echoed);
+                                }
+                            }
+                            if let Some(ref recorder) = recording_mgr {
+                                recorder.write_input(&session_id, &data);
+                            }
+                            for chunk in split_write_chunks(&data, config.force_character_at_a_time) {
+                                if let Err(e) = writer.write_all(&chunk).await {
+                                    write_failed = Some(e);
+                                    break;
+                                }
+                            }
+                        }
+
+                        if let Some(e) = write_failed {
+                            log_rate_limited(StructuredLog {
+                                level: StructuredLogLevel::Warn,
+                                domain: "session.lifecycle".to_string(),
+                                event: "telnet.write_error".to_string(),
+                                message: "Telnet write error".to_string(),
+                                ids: Some(serde_json::json!({
+                                    "session_id": session_id.clone(),
+                                    "connection_id": connection_id.clone(),
+                                })),
+                                data: Some(serde_json::json!({
+                                    "session_type": "Telnet",
+                                })),
+                                error: Some(serde_json::json!({ "message": e.to_string() })),
+                                client_timestamp: None,
+                            });
+                            break;
+                        }
+                    }
+                    Some(SessionCommand::CaptureExec { marker_id, wrapped_command, result_tx }) => {
+                        capture_processor.lock().await.register(marker_id, result_tx);
+                        if let Err(e) = writer.write_all(&wrapped_command).await {
+                            tracing::warn!(
+                                session_id = %session_id,
+                                error = %e,
+                                "Failed to write capture command to Telnet"
+                            );
+                        }
+                    }
+                    Some(SessionCommand::CancelCapture { marker_id }) => {
+                        capture_processor.lock().await.cancel(&marker_id);
+                    }
+                    Some(SessionCommand::Resize { cols, rows }) => {
+                        if let Some(naws) = maybe_build_naws(cols as u16, rows as u16, &config) {
+                            let _ = writer.write_all(&naws).await;
+                        }
+                    }
+                    Some(SessionCommand::PauseOutput) => {
+                        let _ = pause_tx.send(true);
+                    }
+                    Some(SessionCommand::ResumeOutput) => {
+                        let _ = pause_tx.send(false);
+                    }
+                    Some(SessionCommand::ZmodemAcceptDownload { save_dir }) => {
+                        let mut zm = zmodem_state.lock().await;
+                        if let Some(ref mut transfer) = *zm {
+                            let actions = transfer.accept_download(save_dir);
+                            for action in actions {
+                                match action {
+                                    ZmodemAction::SendToRemote(data) => { let _ = writer.write_all(&data).await; }
+                                    ZmodemAction::EmitEvent(event) => { let _ = app.emit(&zmodem_event_name, &event); }
+                                }
+                            }
+                            if transfer.is_done() { *zm = None; }
+                        }
+                    }
+                    Some(SessionCommand::ZmodemAcceptUpload { files }) => {
+                        let mut zm = zmodem_state.lock().await;
+                        if let Some(ref mut transfer) = *zm {
+                            let actions = transfer.accept_upload(files);
+                            for action in actions {
+                                match action {
+                                    ZmodemAction::SendToRemote(data) => { let _ = writer.write_all(&data).await; }
+                                    ZmodemAction::EmitEvent(event) => { let _ = app.emit(&zmodem_event_name, &event); }
+                                }
+                            }
+                            if transfer.is_done() { *zm = None; }
+                        }
+                    }
+                    Some(SessionCommand::ZmodemCancel) => {
+                        manager.clear_pending_zmodem_upload(&session_id).await;
+                        let mut zm = zmodem_state.lock().await;
+                        if let Some(ref mut transfer) = *zm {
+                            let actions = transfer.cancel();
+                            for action in actions {
+                                match action {
+                                    ZmodemAction::SendToRemote(data) => { let _ = writer.write_all(&data).await; }
+                                    ZmodemAction::EmitEvent(event) => { let _ = app.emit(&zmodem_event_name, &event); }
+                                }
+                            }
+                        }
+                        *zm = None;
+                    }
+                    Some(SessionCommand::Close) | None => {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    output.close();
+    reader_handle.abort();
+    if let Some(ref recorder) = recording_mgr {
+        recorder.cleanup_session(&session_id);
+    }
+    manager.remove_session(&session_id).await;
+    let _ = app.emit(&closed_event, ());
+}

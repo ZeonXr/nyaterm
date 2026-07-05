@@ -1,0 +1,51 @@
+pub async fn apply_portable_snapshot(
+    app: &AppHandle,
+    snapshot: &PortableSnapshot,
+) -> AppResult<()> {
+    validate_portable_snapshot(snapshot)?;
+
+    config::save_sessions(app, &snapshot.sessions)?;
+    config::save_keys(app, &snapshot.keys)?;
+    config::save_passwords(app, &snapshot.passwords)?;
+    config::save_credentials(app, &snapshot.credentials)?;
+    config::save_otp_entries(app, &snapshot.otp)?;
+    config::save_proxies(app, &snapshot.proxies)?;
+    config::save_proxy_groups(app, &snapshot.proxy_groups)?;
+    config::save_tunnels(app, &snapshot.tunnels)?;
+    config::save_tunnel_groups(app, &snapshot.tunnel_groups)?;
+    config::save_quick_commands(app, &snapshot.quick_commands)?;
+    crate::storage::replace_command_history_entries(&snapshot.history)?;
+
+    let merged = snapshot
+        .settings
+        .clone()
+        .apply_to(config::load_app_settings(app).unwrap_or_default());
+    let mut persisted = merged.clone();
+    persisted.cloud_sync = config::encrypt_cloud_sync_settings(merged.cloud_sync.clone())?;
+    persisted.ai = config::encrypt_ai_settings(merged.ai.clone())?;
+    config::save_app_settings(app, &persisted)?;
+
+    if let Some(master_key) = &snapshot.master_key_token {
+        crate::storage::save_master_key_token(master_key)?;
+    }
+    if !snapshot.known_hosts.is_empty() {
+        crate::storage::replace_known_hosts_export(&snapshot.known_hosts)?;
+    }
+
+    let quick_commands_store = app.state::<Arc<QuickCommandsStore>>();
+    quick_commands_store.load_from_disk(app)?;
+
+    let session_manager = app.state::<Arc<SessionManager>>();
+    session_manager
+        .inner()
+        .as_ref()
+        .reload_history_from_storage()
+        .await?;
+
+    let _ = app.emit("connections-changed", ());
+    let _ = app.emit("quick-commands-changed", ());
+    let _ = app.emit("settings-changed", ());
+    let _ = app.emit("command-history-changed", ());
+
+    Ok(())
+}

@@ -121,7 +121,7 @@ fn validate_local_terminal_config(connection: &SavedConnection) -> AppResult<()>
         }
     }
 
-    crate::core::pty::parse_shell_args(shell_args).map_err(AppError::Config)?;
+    crate::core::terminal_session::local::parse_shell_args(shell_args).map_err(AppError::Config)?;
 
     Ok(())
 }

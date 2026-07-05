@@ -1,6 +1,6 @@
 //! Shared OSC parsing, shell detection types, and injection script generation.
 //!
-//! Used by both SSH (`core::ssh::io`) and local PTY (`core::pty`) to avoid duplication.
+//! Used by both SSH (`core::ssh::io`) and local PTY (`core::terminal_session::local`) to avoid duplication.
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;

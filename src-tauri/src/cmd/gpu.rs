@@ -1,5 +1,7 @@
 use crate::core::SessionManager;
-use crate::core::gpu::{GPU_OVERVIEW_SCRIPT, RemoteGpuOverview, parse_gpu_overview_output};
+use crate::core::monitoring::gpu::{
+    GPU_OVERVIEW_SCRIPT, RemoteGpuOverview, parse_gpu_overview_output,
+};
 use crate::core::remote_exec::{ensure_success, exec_ssh_session_command};
 use crate::error::AppResult;
 use std::sync::Arc;

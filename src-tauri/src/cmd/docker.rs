@@ -1,5 +1,5 @@
 use crate::core::SessionManager;
-use crate::core::docker::{
+use crate::core::monitoring::docker::{
     DOCKER_COMPOSE_PROJECTS_SCRIPT, DOCKER_IMAGES_SCRIPT, DOCKER_NETWORKS_SCRIPT,
     DOCKER_OVERVIEW_SCRIPT, DOCKER_VOLUMES_SCRIPT, DockerComposeProject, DockerComposeService,
     DockerContainerDetails, DockerContainerStats, DockerImage, DockerNetwork, DockerVolume,
