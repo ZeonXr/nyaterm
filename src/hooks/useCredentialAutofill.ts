@@ -72,6 +72,7 @@ export function useCredentialAutofill(
   const matchesRef = useRef<SavedCredential[]>([]);
 
   const credentialsRef = useRef<SavedCredential[]>([]);
+  const credentialsLoadedRef = useRef(false);
   const loadInFlightRef = useRef<Promise<void> | null>(null);
   const detectionInFlightRef = useRef(false);
   const detectionPendingRef = useRef(false);
@@ -86,7 +87,9 @@ export function useCredentialAutofill(
   const feedOutputRef = useRef<((payload: string) => void) | null>(null);
   const handleSelectRef = useRef<((credential: SavedCredential) => Promise<void>) | null>(null);
 
-  const loadCredentials = useCallback(async () => {
+  const loadCredentials = useCallback(async (force = false) => {
+    if (credentialsLoadedRef.current && !force) return;
+
     if (loadInFlightRef.current) {
       await loadInFlightRef.current;
       return;
@@ -95,9 +98,11 @@ export function useCredentialAutofill(
     const promise = invoke<SavedCredential[]>("get_saved_credentials")
       .then((creds) => {
         credentialsRef.current = creds;
+        credentialsLoadedRef.current = true;
       })
       .catch(() => {
         credentialsRef.current = [];
+        credentialsLoadedRef.current = true;
       })
       .finally(() => {
         loadInFlightRef.current = null;
@@ -113,7 +118,7 @@ export function useCredentialAutofill(
 
     void loadCredentials();
     void listen<void>("credentials-changed", () => {
-      if (!cancelled) void loadCredentials();
+      if (!cancelled) void loadCredentials(true);
     }).then((cleanup) => {
       if (cancelled) cleanup();
       else unlisten = cleanup;
