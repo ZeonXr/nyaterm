@@ -7,11 +7,12 @@ sidebar_position: 1
 SSH is still NyaTerm's most complete session type. Beyond a basic login, an SSH connection can also be tied to:
 
 - SFTP file explorer
-- Remote resource monitoring
+- Remote resource, GPU, process, and Docker monitoring
 - Proxy
 - Jump host
 - OTP binding and auto-fill
 - Port tunnels
+- SSH algorithm preferences
 
 If you are new to NyaTerm, it usually makes sense to configure SSH first, then expand into file workflows, terminal enhancements, and network features.
 
@@ -135,6 +136,22 @@ Remote server requirements:
 
 If you need to override the local DISPLAY value, set **Settings → Terminal → Local X11 DISPLAY**. Common values are `localhost:0` on Windows and `:0` on Linux/macOS.
 
+### SSH algorithm preferences
+
+You can control, per connection, which encryption algorithms are negotiated during the SSH handshake. This lives in the **SSH Algorithms** card under Advanced Configuration and offers three modes:
+
+- **Compatible (default)**: uses a broad algorithm list including some legacy entries, so connections to older servers or network gear still succeed
+- **Secure**: uses only modern algorithms and excludes legacy fallbacks
+- **Custom**: pick and reorder algorithms across four categories — **key exchange / ciphers / MACs / host keys**
+
+Each algorithm carries a risk label:
+
+- **Modern** (green)
+- **Legacy** (amber, e.g. `ssh-rsa`, `*-cbc`)
+- **Insecure** (red, e.g. `3des-cbc`, `hmac-sha1`, `ssh-dss`)
+
+When you save a custom configuration, NyaTerm validates that each category is non-empty and rejects unknown algorithm names. If you are unsure what to pick, keep **Compatible** mode; for security-sensitive environments, use **Secure** or a custom, tightened list.
+
 ### Multiplexed SSH sessions
 
 NyaTerm can multiplex multiple terminal sessions over a single SSH connection. Opening additional terminals to the same host reuses the existing authenticated connection instead of re-authenticating each time.
@@ -169,6 +186,34 @@ Common operations include:
 - Reconnect from an existing saved source
 
 If you manage many hosts, using groups, icons, and descriptions helps separate environments, projects, and roles.
+
+## Temporary SSH links
+
+If you just want a one-off connection without saving it, use a **temporary SSH link**. Open the dialog from the Saved Connections panel (also reachable via a global keyboard shortcut) and paste an address to start a throwaway session.
+
+Two input forms are supported:
+
+- `ssh://user@host:port` URLs
+- `ssh [-p port] [-l user] user@host` command strings
+
+Conventions and limits:
+
+- Default username is `root` and default port is `22`
+- Uses password authentication, with no proxy, jump host, post-login command, or X11
+- For safety, inline passwords (`user:pass@`) and unsupported options such as `-J`, `-L/-R/-D`, `-i`, and `-o ProxyJump/ProxyCommand` are rejected with a specific error message
+
+A temporary session never becomes a saved connection: NyaTerm strips the connection ID, proxy, jump host, post-login command, X11, and algorithm preferences, so it stays a one-off session.
+
+## Session input synchronization
+
+When you need to run the same operation on several hosts at once, use **session input sync groups** to broadcast what you type in one terminal to multiple sessions.
+
+- Create named, colored sync groups in the sync group manager dialog and add currently live sessions to a group
+- A group can be enabled or disabled as a whole, and individual sessions can be paused
+- While a session belongs to an enabled group, keystrokes in one terminal are mirrored to the other non-paused sessions in the group; command preview and history are recorded only on the origin session where you actually type
+- The bottom **Send Command** panel adds a target selector: current session, all sessions, or a specific `Group: <name>`. Group targets are filtered by session type (Serial vs shell) and exclude paused or duplicate sessions
+
+Sync groups are runtime state and are not persisted, so you need to recreate them after restarting the app.
 
 ## Import sessions from other clients
 

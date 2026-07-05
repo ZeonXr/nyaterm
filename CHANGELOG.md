@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 This changelog is inferred from release bump commits in git history (for example `chore: bump version to vX.Y.Z`) and grouped by Conventional Commit type.
 
+## [Unreleased]
+
+### Added
+
+- **gpu:** Add a GPU monitoring panel for SSH hosts, showing driver/CUDA versions, per-GPU utilization, memory, temperature, power, fan, and a searchable per-process GPU usage list, with a `Show GPU Monitor` toggle and configurable poll interval.
+- **docker:** Add a Docker management panel for SSH hosts covering containers, images, volumes, networks, and Compose projects, with container details, logs, exec/enter, lifecycle actions, and confirmed destructive operations such as remove, kill, compose down, and `system prune`.
+- **process:** Add a process management panel for SSH hosts with a live, sortable, searchable process list, per-process detail, `renice`, and signal sending (TERM/HUP/STOP/CONT and confirmed KILL).
+- **app:** Track live session state so monitor panels bind only to a genuinely active SSH session, and gate activity-panel visibility so toggled-off panels are not auto-opened.
+- **ssh:** Add per-connection SSH algorithm preferences with Compatible / Secure / Custom modes, reorderable key-exchange, cipher, MAC, and host-key lists, and Modern/Legacy/Insecure risk labels.
+- **connections:** Add a temporary SSH link dialog that opens a one-off session from a pasted `ssh://` URL or `ssh` command string without saving a connection.
+- **terminal:** Add session input synchronization via named sync groups, mirroring keystrokes to grouped peers, plus a Send Command target selector for current session, all sessions, or a specific group.
+- **file-transfer:** Surface Zmodem (rz/sz) transfers in the transfer list with progress and Zmodem-appropriate controls.
+- **terminal:** Add Unicode grapheme support for correct rendering and cursor width of emoji, combining marks, and ZWJ sequences.
+- **terminal:** Add a Clear Input action (Ctrl/Cmd+L) available from the context menu and keyboard shortcut.
+- **terminal:** Add a Close All Sessions confirmation dialog before closing all tabs.
+- **ai:** Add a background execution setting for the AI Assistant.
+- **app-lock:** Add window close confirmation and control to the lock screen.
+- **window:** Enhance main window state management and positioning.
+- **importer:** Extract user and host from WindTerm session imports.
+
+### Changed
+
+- **terminal:** Expand built-in keyword highlight presets with more error and success phrases.
+- **ai:** Improve model name handling for the Deepseek provider.
+- **serial:** Refine the serial session form layout for better responsiveness.
+
+### Fixed
+
+- **russh:** Improve name-list parsing to handle trailing commas and reject invalid entries.
+- **ssh:** Improve X11 channel handling in the SSH handler.
+- **ssh:** Suppress the flashing console window when running local system shell commands on Windows.
+- **hooks:** Add reload handling for forced credential loading.
+
+### Performance
+
+- **sftp:** Add channel-concurrency limiting and automatic retry with backoff for transient SFTP channel-open failures.
+- **watcher:** Use content fingerprinting so auto-upload triggers only on real content changes, not editor metadata-only saves.
+- **hooks:** Add a forced-reload option to credential loading.
+
 ## [1.1.12] - 2026-06-30
 
 ### Added

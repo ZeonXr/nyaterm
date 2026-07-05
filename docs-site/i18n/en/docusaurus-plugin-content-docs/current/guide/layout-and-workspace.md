@@ -111,9 +111,11 @@ The right side is mainly for live state and navigation:
 - Saved connections
 - Active sessions
 - Command history
-- Resource monitor
+- Resource monitor, GPU monitor, process manager, and Docker manager (SSH sessions)
 
 If your workflow is "pick a connection, then inspect live state," this split feels natural.
+
+The GPU monitor, process manager, and Docker manager panels are off by default; enable them per panel in **Settings → Terminal**. When a panel is disabled its activity-bar icon is hidden, and monitor panels only bind to a genuinely active SSH session.
 
 ## Bottom helper area
 

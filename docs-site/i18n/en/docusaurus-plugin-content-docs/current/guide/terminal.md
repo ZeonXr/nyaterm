@@ -174,14 +174,23 @@ For SSH sessions, you can configure a Keep-Alive interval in **Settings → Term
 - Set it to `0` to disable it
 - Useful for reducing idle disconnects on long-lived sessions
 
-### Remote resource monitoring
+### Remote host monitoring panels
+
+NyaTerm provides four right-side monitoring panels for SSH sessions: **Resource Monitor**, **GPU Monitor**, **Process Manager**, and **Docker Manager**. They share some behavior:
+
+- They only make sense for an **SSH session**, and bind only to a genuinely active SSH session
+- Each is shown or hidden by its own toggle in **Settings → Terminal**; turning a toggle off also hides its activity-bar icon
+- Poll intervals are adjustable, ranging from **3 to 120 seconds**
+- A panel stops refreshing after several consecutive polling failures, to avoid repeatedly hitting an unsupported host
+
+#### Resource Monitor
 
 Remote resource monitoring is on by default. To see data, both of these must be true:
 
 1. The current tab is an **SSH session**
 2. **Show Remote Resource Stats** is enabled in **Settings → Terminal**
 
-When enabled, the **Resource Monitor** icon appears in the right activity bar and the panel polls the host on the configured interval. The default interval is **3 seconds**, and you can change it manually. Turning the setting off also hides the icon.
+When enabled, the **Resource Monitor** icon appears in the right activity bar and the panel polls the host on the configured interval. The default interval is **3 seconds**, and you can change it manually.
 
 The panel displays:
 
@@ -190,6 +199,47 @@ The panel displays:
 - CPU usage
 - Memory usage
 - Network throughput
+
+#### GPU Monitor
+
+The **GPU Monitor** panel shows NVIDIA GPU status on the remote host. It is off by default; enable **Show GPU Monitor** in **Settings → Terminal** (default poll interval 3 seconds).
+
+The panel displays:
+
+- Driver version and CUDA version
+- Summary: GPU count, highest utilization, memory usage, highest temperature
+- Per-GPU card: index, model, performance state (pstate), utilization and memory bars; expand for UUID, temperature, power draw, fan speed, and free memory. Utilization above **70% / 90%** is color-coded differently
+- A searchable GPU process list (filter by PID, GPU index, user, or process name), sorted by GPU memory used
+
+If the remote host has no NVIDIA GPU or is missing `nvidia-smi`, the panel shows a matching empty state.
+
+#### Process Manager
+
+The **Process Manager** panel shows a live process list from the remote host. It is off by default; enable **Show Process Manager** in **Settings → Terminal** (default poll interval 5 seconds).
+
+Key capabilities:
+
+- Total process count and a search box (filter by PID, user, state, command, or full command line)
+- Adaptive layout that adds or drops columns based on panel width; sort by process name, PID, CPU%, MEM%, or user
+- Expand a process for PID/PPID, user, state, CPU%, memory%, RSS, elapsed time, and the full command line, plus adjusting the nice value (`-20` to `19`) and clicking **Apply** (renice)
+- A row action menu to copy the PID or command, or send `TERM` / `HUP` / `STOP` / `CONT` signals; `KILL` first opens a confirmation dialog showing the `kill` command
+
+If the remote host does not support process queries, the panel shows a distinct message.
+
+#### Docker Manager
+
+The **Docker Manager** panel manages Docker on the remote host. It is off by default; enable **Show Docker Manager** in **Settings → Terminal** (default poll interval 10 seconds).
+
+Key capabilities:
+
+- Overview: running / stopped container counts and image count, with the Docker engine version in the header
+- Global search plus tabs for containers, images, volumes, networks, and Compose (when available); extra tabs collapse into a **More** dropdown
+- **Containers**: a state-sorted virtualized list; a row menu views logs (runs `docker logs -f` in the terminal), enters the container (opens a shell), starts / stops / restarts / kills (confirm) / removes (confirm); clicking a row opens a live-refreshing details dialog
+- **Images / Volumes / Networks**: fetched on demand, each row supports removal (confirm)
+- **Compose**: lists projects; expand to lazily load services; supports project-level up / restart / down and service-level logs / enter / up / stop / restart
+- The **More** menu offers `docker system prune` (destructive, confirmed)
+
+Logs and enter-container actions run in the real terminal session; remove, kill, Compose down, prune, and other destructive operations route through a confirmation dialog showing the exact command.
 
 ## Translation and online search
 

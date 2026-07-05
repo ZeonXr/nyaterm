@@ -123,6 +123,24 @@ If you often sync the same directories in batches, tune the default conflict str
 
 The newer SFTP backend improves directory handling, symlinks, known-size downloads, and large uploads. You usually do not need to think about the implementation details; the visible result is clearer speed feedback, more specific errors, and directory/symlink behavior that is closer to OpenSSH.
 
+NyaTerm also limits how many SFTP channels run concurrently on a single SSH connection, and automatically retries with backoff when a channel open hits a transient failure. This keeps multiple file operations on the same host more stable, so a momentary shortage of channel resources is less likely to surface as an error. These are backend behaviors with no settings to configure.
+
+## Zmodem transfers (rz / sz)
+
+Besides SFTP, NyaTerm supports the Zmodem transfers common in the terminal — the ones triggered when you run `rz` (upload to the remote) or `sz` (download from the remote) on the host.
+
+- When `rz` is detected, NyaTerm prompts you to pick the local files to upload; before uploading it probes the remote directory for name conflicts and resolves them
+- When `sz` is detected, NyaTerm prompts you for a local save directory
+- Zmodem transfers appear as items in the transfer queue with live progress
+
+Note that the controls available for Zmodem transfers differ from regular SFTP transfers:
+
+- Zmodem items **do not** support pause, resume, retry, or cancel
+- Once a transfer finishes, you can only remove it from the list
+- The panel's **Pause all / Resume all / Retry all** actions skip Zmodem items automatically
+
+This is because the Zmodem protocol is driven directly by both ends of the terminal; NyaTerm only handles progress display and file selection, and does not intervene in the protocol's own pause/resume behavior.
+
 ## Sync with terminal paths
 
 The file explorer can work together with the current SSH terminal path:
@@ -142,6 +160,8 @@ This is one of NyaTerm's most practical workflows for real operations work.
 2. NyaTerm downloads it into a local temp directory
 3. A file watcher is started
 4. After you save in your local editor, NyaTerm opens an upload prompt
+
+NyaTerm fingerprints the watched file by content (it hashes the content for smaller files and falls back to size and modification time for larger ones). The upload prompt only fires when the file's **content** actually changes; saves that only touch the timestamp or that write identical content will not trigger a spurious upload. This also handles atomic saves (write a temp file, then rename) correctly.
 
 ### Upload prompt window
 
