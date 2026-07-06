@@ -14,6 +14,7 @@ docs-site/.docusaurus
 dist
 dist-ssr
 *.local
+target/
 
 # Editor directories and files
 .vscode/*
