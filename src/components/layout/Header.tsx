@@ -183,6 +183,7 @@ export default function Header({
     ? savedConnections?.find((c) => c.id === activePane.connectionId)
     : undefined;
   const activeDisplayName = activeTab ? getTabDisplayName(activeTab) : "NyaTerm";
+  const terminalZoomEnabled = appSettings.interaction.terminal_zoom_enabled;
 
   useEffect(() => {
     let mounted = true;
@@ -218,6 +219,7 @@ export default function Header({
   };
 
   const handleZoom = (delta: number) => {
+    if (!terminalZoomEnabled) return;
     updateAppSettings((prev) => ({
       terminal: {
         ...prev.terminal,
@@ -235,10 +237,12 @@ export default function Header({
     }));
   };
 
-  const handleResetZoom = () =>
+  const handleResetZoom = () => {
+    if (!terminalZoomEnabled) return;
     updateAppSettings((prev) => ({
       terminal: { ...prev.terminal, font_size_delta: resetTerminalFontSizeDelta() },
     }));
+  };
 
   const menuKeys = [
     { key: "file", label: t("menu.file") },
@@ -294,18 +298,21 @@ export default function Header({
         action: () => handleZoom(0.1),
         icon: "zoom_in",
         shortcut: dk("view.zoomIn"),
+        disabled: !terminalZoomEnabled,
       },
       {
         label: t("menu.zoomOut"),
         action: () => handleZoom(-0.1),
         icon: "zoom_out",
         shortcut: dk("view.zoomOut"),
+        disabled: !terminalZoomEnabled,
       },
       {
         label: t("menu.resetZoom"),
         action: handleResetZoom,
         icon: "restart_alt",
         shortcut: dk("view.resetZoom"),
+        disabled: !terminalZoomEnabled,
       },
     ],
     terminal: [

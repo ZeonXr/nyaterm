@@ -33,10 +33,12 @@ function eventTargetIsInsideTerminalRoot(event: WheelEvent) {
 export function useTerminalZoom(
   updateAppSettings: UpdateAppSettings,
   keybindings: Record<string, string> = {},
+  enabled = true,
 ) {
   const lastCtrlWheelZoomAtRef = useRef(0);
 
   const handleZoomIn = useCallback(() => {
+    if (!enabled) return;
     updateAppSettings((prev) => ({
       terminal: {
         ...prev.terminal,
@@ -46,9 +48,10 @@ export function useTerminalZoom(
         ),
       },
     }));
-  }, [updateAppSettings]);
+  }, [enabled, updateAppSettings]);
 
   const handleZoomOut = useCallback(() => {
+    if (!enabled) return;
     updateAppSettings((prev) => ({
       terminal: {
         ...prev.terminal,
@@ -58,15 +61,18 @@ export function useTerminalZoom(
         ),
       },
     }));
-  }, [updateAppSettings]);
+  }, [enabled, updateAppSettings]);
 
   const handleResetZoom = useCallback(() => {
+    if (!enabled) return;
     updateAppSettings((prev) => ({
       terminal: { ...prev.terminal, font_size_delta: resetTerminalFontSizeDelta() },
     }));
-  }, [updateAppSettings]);
+  }, [enabled, updateAppSettings]);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const handleKeyboardZoom = (event: KeyboardEvent) => {
       if (matchesKeyEvent(resolveShortcutKeys("view.zoomIn", keybindings), event)) {
         event.preventDefault();
@@ -93,9 +99,11 @@ export function useTerminalZoom(
     return () => {
       window.removeEventListener("keydown", handleKeyboardZoom, true);
     };
-  }, [handleResetZoom, handleZoomIn, handleZoomOut, keybindings]);
+  }, [enabled, handleResetZoom, handleZoomIn, handleZoomOut, keybindings]);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const handleCtrlWheelZoom = (event: WheelEvent) => {
       if (!event.ctrlKey && !event.metaKey) return;
       if (event.deltaY === 0) return;
@@ -117,7 +125,7 @@ export function useTerminalZoom(
     return () => {
       window.removeEventListener("wheel", handleCtrlWheelZoom, true);
     };
-  }, [handleZoomIn, handleZoomOut]);
+  }, [enabled, handleZoomIn, handleZoomOut]);
 
   return {
     handleZoomIn,

@@ -82,6 +82,22 @@ export function InteractionTab() {
       </SettingSection>
 
       <SettingSection
+        title={t("settings.interactionTerminalPage")}
+        desc={t("settings.interactionTerminalPageDesc")}
+        contentClassName="space-y-5"
+      >
+        <SettingRow
+          label={t("settings.terminalZoomEnabled")}
+          desc={t("settings.terminalZoomEnabledDesc")}
+        >
+          <SettingSwitch
+            checked={interaction.terminal_zoom_enabled}
+            onChange={(v) => updateInteraction({ terminal_zoom_enabled: v })}
+          />
+        </SettingRow>
+      </SettingSection>
+
+      <SettingSection
         title={t("settings.interactionCommandInput")}
         desc={t("settings.interactionCommandInputDesc")}
         contentClassName="space-y-5"

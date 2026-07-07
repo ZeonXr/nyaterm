@@ -9,6 +9,8 @@ pub struct InteractionSettings {
     #[serde(default = "default_true")]
     pub right_click_paste: bool,
     #[serde(default = "default_true")]
+    pub terminal_zoom_enabled: bool,
+    #[serde(default = "default_true")]
     pub command_suggestions_enabled: bool,
     #[serde(default = "default_command_suggestion_min_chars")]
     pub command_suggestion_min_chars: usize,
@@ -73,6 +75,7 @@ impl Default for InteractionSettings {
             copy_on_select: false,
             allow_osc52_clipboard_write: false,
             right_click_paste: false,
+            terminal_zoom_enabled: true,
             command_suggestions_enabled: true,
             command_suggestion_min_chars: default_command_suggestion_min_chars(),
             command_suggestion_max_chars: default_command_suggestion_max_chars(),
@@ -102,6 +105,7 @@ mod tests {
         assert!(!settings.allow_osc52_clipboard_write);
         assert!(!settings.alt_as_meta);
         assert!(!settings.mac_ime_compatibility);
+        assert!(settings.terminal_zoom_enabled);
     }
 
     #[test]
@@ -124,5 +128,6 @@ mod tests {
         assert!(!settings.allow_osc52_clipboard_write);
         assert!(!settings.alt_as_meta);
         assert!(!settings.mac_ime_compatibility);
+        assert!(settings.terminal_zoom_enabled);
     }
 }

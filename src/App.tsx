@@ -1375,6 +1375,7 @@ function App() {
   const { handleZoomIn, handleZoomOut, handleResetZoom } = useTerminalZoom(
     updateAppSettings,
     appSettings.keybindings,
+    appSettings.interaction.terminal_zoom_enabled,
   );
 
   const handleOpenSettings = useCallback(() => {
