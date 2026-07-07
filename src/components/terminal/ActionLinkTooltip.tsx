@@ -112,6 +112,9 @@ export default function ActionLinkTooltip({ state }: ActionLinkTooltipProps) {
                 <span className="text-muted-foreground font-sans">{t("terminal.click")}</span>
               </div>
               <span className="text-muted-foreground/40 shrink-0">→</span>
+              <span className="text-muted-foreground font-sans shrink-0">
+                {t("terminal.actionLinkPrepareCommand")}
+              </span>
               <span
                 className="text-foreground tracking-tight truncate border-b border-foreground/10 pb-[1px]"
                 title={defaultAction.command}

@@ -30,7 +30,7 @@ export interface MenuState {
   y: number;
   link: ActionLink;
   actions: ResolvedAction[];
-  execute: (actionId: string) => void;
+  prepare: (actionId: string) => void;
 }
 
 export interface UseActionLinksResult {
@@ -48,7 +48,7 @@ export function useActionLinks(
   terminal: Terminal | null,
   terminalSettings: AppSettings["terminal"],
   _sessionId: string,
-  executeCommandRef: React.RefObject<((command: string) => void) | null>,
+  prepareCommandRef: React.RefObject<((command: string) => void) | null>,
   suspended = false,
 ): UseActionLinksResult {
   const addonRef = useRef<ActionLinksAddon | null>(null);
@@ -87,13 +87,13 @@ export function useActionLinks(
       allowCtrlOrMetaClickExecute: true,
       allowAltClickMenu: true,
       fallbackAltClickToDefaultAction: true,
-      executeCommand: (command) => executeCommandRef.current?.(command),
+      executeCommand: (command) => prepareCommandRef.current?.(command),
       showTooltip: ({ event, link }) => {
         setTooltipState({ x: event.clientX, y: event.clientY, link });
       },
       hideTooltip: () => setTooltipState(null),
       showMenu: ({ event, link, actions, execute }) => {
-        setMenuState({ x: event.clientX, y: event.clientY, link, actions, execute });
+        setMenuState({ x: event.clientX, y: event.clientY, link, actions, prepare: execute });
       },
     };
 
@@ -109,7 +109,7 @@ export function useActionLinks(
       setTooltipState(null);
       setMenuState(null);
     };
-  }, [terminal, enabled, executeCommandRef]);
+  }, [terminal, enabled, prepareCommandRef]);
 
   // Sync matchers and enabled state when settings change
   useEffect(() => {

@@ -259,7 +259,6 @@ export default function XTerminal({
   const tRef = useRef(t);
   const doFindRef = useRef<(selection?: string) => void>(() => {});
   const pasteTextRef = useRef<(text: string, options?: { skipDialog?: boolean }) => void>(() => {});
-  const executeActionCommandRef = useRef<((command: string) => void) | null>(null);
   const disconnectedRef = useRef(false);
   const reconnectingRef = useRef(false);
   const preservedReconnectContentRef = useRef<string | null>(null);
@@ -722,10 +721,6 @@ export default function XTerminal({
     const handleInputPreview = (preview: SessionInputPreview) => {
       inputStateRef.current = applyTerminalInputPreview(inputStateRef.current, preview);
       syncSuggestionsWithInputState();
-    };
-
-    executeActionCommandRef.current = (command: string) => {
-      void executeInputCommand(command).catch(() => {});
     };
 
     const isCredentialPromptInputMode = () => {
@@ -2054,7 +2049,6 @@ export default function XTerminal({
       clearCredentialPromptInputMode();
       shellIntegrationRef.current.enabled = false;
       shellIntegrationRef.current.commandRunning = false;
-      executeActionCommandRef.current = null;
       replaceInputCommandRef.current = null;
       pasteTextRef.current = () => {};
       resetCredentialAutofill();
@@ -2136,7 +2130,7 @@ export default function XTerminal({
     terminalInstance,
     terminalSettings,
     sessionId,
-    executeActionCommandRef,
+    replaceInputCommandRef,
     performanceMode === "overloaded" || !visible,
   );
 

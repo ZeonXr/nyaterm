@@ -48,11 +48,11 @@ export default function ActionLinkMenu({ state, onClose }: ActionLinkMenuProps) 
 
   if (!state) return null;
 
-  const { x, y, link, actions, execute } = state;
+  const { x, y, link, actions, prepare } = state;
   const pos = computeMenuPosition(x, y, ref.current);
 
   const handleAction = (actionId: string) => {
-    execute(actionId);
+    prepare(actionId);
     onClose();
   };
 

@@ -22,7 +22,7 @@ function defaultTooltip(ctx: ActionContext, defaultAction?: ActionDefinition): s
   const lines = [
     `Type: ${ctx.kind}`,
     `Value: ${ctx.value}`,
-    `Ctrl/Cmd + Click to execute default action`,
+    `Ctrl/Cmd + Click to prepare default command`,
     `Alt + Click to view more actions`,
   ];
 
