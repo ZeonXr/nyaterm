@@ -56,6 +56,7 @@ import type {
   SshAlgorithmDefaults,
   SshAlgorithmPreferences,
   SshKey,
+  SftpSettings,
   SupportedSshAlgorithms,
 } from "@/types/global";
 
@@ -105,6 +106,8 @@ interface SshFormProps {
   setX11Forwarding: (v: boolean) => void;
   sshAlgorithms: SshAlgorithmPreferences;
   setSshAlgorithms: (v: SshAlgorithmPreferences) => void;
+  sftpSettings: SftpSettings;
+  setSftpSettings: (v: SftpSettings) => void;
   connectionId?: string;
 }
 
@@ -420,6 +423,8 @@ export function SshForm({
   setX11Forwarding,
   sshAlgorithms,
   setSshAlgorithms,
+  sftpSettings,
+  setSftpSettings,
   connectionId,
 }: SshFormProps) {
   const { t } = useTranslation();
@@ -1035,9 +1040,12 @@ export function SshForm({
             </TabsContent>
           </Tabs>
           <Tabs defaultValue="post-login" className="w-full">
-            <TabsList className="grid h-8 w-full grid-cols-3 pointer-events-auto">
+            <TabsList className="grid h-8 w-full grid-cols-4 pointer-events-auto">
               <TabsTrigger value="post-login" className="text-xs">
                 {t("dialog.commandExecution")}
+              </TabsTrigger>
+              <TabsTrigger value="sftp" className="text-xs">
+                SFTP
               </TabsTrigger>
               <TabsTrigger value="x11" className="text-xs">
                 {t("dialog.x11Forwarding")}
@@ -1100,6 +1108,66 @@ export function SshForm({
                       <span className="shrink-0 text-[0.625rem] text-muted-foreground">ms</span>
                     </div>
                   </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="sftp" className="mt-3 border-0 outline-none">
+              <div className="rounded-lg border bg-accent/25 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="text-xs font-medium">{t("dialog.sftpAdvanced")}</div>
+                    <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
+                      {t("dialog.sftpAdvancedDesc")}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Switch
+                      checked={sftpSettings.enabled}
+                      onCheckedChange={(enabled) =>
+                        setSftpSettings({
+                          ...sftpSettings,
+                          enabled,
+                        })
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {t("dialog.enabled", "Enabled")}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3 max-w-md">
+                  <Label className="text-xs font-medium text-foreground/80">
+                    {t("dialog.sftpCwdFollowMode")}
+                  </Label>
+                  <Select
+                    value={sftpSettings.cwd_follow_mode}
+                    onValueChange={(cwd_follow_mode) =>
+                      setSftpSettings({
+                        ...sftpSettings,
+                        cwd_follow_mode: cwd_follow_mode as SftpSettings["cwd_follow_mode"],
+                      })
+                    }
+                  >
+                    <SelectTrigger className="mt-1 h-8 text-xs font-normal">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="off">{t("dialog.sftpCwdFollowOff")}</SelectItem>
+                      <SelectItem value="shell_integration">
+                        {t("dialog.sftpCwdFollowShellIntegration")}
+                      </SelectItem>
+                      <SelectItem value="rc_file">{t("dialog.sftpCwdFollowRcFile")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-2 text-[0.6875rem] leading-relaxed text-muted-foreground">
+                    {sftpSettings.cwd_follow_mode === "off"
+                      ? t("dialog.sftpCwdFollowOffDesc")
+                      : sftpSettings.cwd_follow_mode === "rc_file"
+                        ? t("dialog.sftpCwdFollowRcFileDesc")
+                        : t("dialog.sftpCwdFollowShellIntegrationDesc")}
+                  </p>
                 </div>
               </div>
             </TabsContent>

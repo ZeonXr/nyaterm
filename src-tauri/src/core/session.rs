@@ -85,6 +85,13 @@ pub struct SessionInfo {
     /// Currently this is enabled for sessions that can report directory changes to the backend.
     #[serde(default)]
     pub injection_active: bool,
+    /// True when the remote file browser is enabled for this session.
+    #[serde(default = "default_remote_file_browser_enabled")]
+    pub remote_file_browser_enabled: bool,
+}
+
+fn default_remote_file_browser_enabled() -> bool {
+    true
 }
 
 /// Commands sent from the frontend to a session's I/O loop.
@@ -689,6 +696,7 @@ mod tests {
                 owner_window_label: None,
                 ai_execution_profile: AiExecutionProfile::Auto,
                 injection_active,
+                remote_file_browser_enabled: true,
             },
             cmd_tx,
             ssh_config: None,

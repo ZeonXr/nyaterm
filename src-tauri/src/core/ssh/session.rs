@@ -222,6 +222,7 @@ async fn create_ssh_session_inner(
             &mut handle,
             &session_id,
             x11_config.as_ref().map(|cfg| cfg.fake_cookie_hex.as_str()),
+            config.sftp.cwd_follow_mode.clone(),
         )
         .await?;
     drop(handle);
@@ -239,6 +240,7 @@ async fn create_ssh_session_inner(
         owner_window_label,
         ai_execution_profile: AiExecutionProfile::Posix,
         injection_active,
+        remote_file_browser_enabled: config.sftp.enabled,
     };
 
     let cwd: SharedCwd = Arc::new(tokio::sync::Mutex::new(None));
@@ -371,7 +373,13 @@ pub async fn create_multiplexed_ssh_session(
     let handle_mtx = ssh_connection.target_handle();
     let mut handle = handle_mtx.lock().await;
     let (channel, injection_script, ready_marker, detected_shell, initial_notice) =
-        open_shell_channel(&mut handle, &session_id, None).await?;
+        open_shell_channel(
+            &mut handle,
+            &session_id,
+            None,
+            config.sftp.cwd_follow_mode.clone(),
+        )
+        .await?;
     drop(handle);
     let injection_active = injection_script.is_some();
 
@@ -383,6 +391,7 @@ pub async fn create_multiplexed_ssh_session(
         owner_window_label,
         ai_execution_profile: AiExecutionProfile::Posix,
         injection_active,
+        remote_file_browser_enabled: config.sftp.enabled,
     };
 
     let cwd: SharedCwd = Arc::new(tokio::sync::Mutex::new(None));

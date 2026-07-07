@@ -33,6 +33,7 @@ pub async fn create_local_session(
         owner_window_label,
         ai_execution_profile,
         injection_active,
+        remote_file_browser_enabled: false,
     };
 
     let cwd: SharedCwd = Arc::new(tokio::sync::Mutex::new(None));

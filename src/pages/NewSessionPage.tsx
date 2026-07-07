@@ -35,6 +35,7 @@ import type {
   ProxyConfig,
   SavedConnection,
   SshAlgorithmPreferences,
+  SftpSettings,
 } from "@/types/global";
 
 const isValidPort = (value: number) => Number.isInteger(value) && value >= 1 && value <= 65535;
@@ -47,6 +48,10 @@ const DEFAULT_SSH_ALGORITHMS: SshAlgorithmPreferences = {
   ciphers: [],
   macs: [],
   host_keys: [],
+};
+const DEFAULT_SFTP_SETTINGS: SftpSettings = {
+  enabled: true,
+  cwd_follow_mode: "shell_integration",
 };
 
 function normalizeSshAlgorithms(
@@ -62,6 +67,13 @@ function normalizeSshAlgorithms(
     ciphers: value.ciphers || [],
     macs: value.macs || [],
     host_keys: value.host_keys || [],
+  };
+}
+
+function normalizeSftpSettings(value: SavedConnection["sftp"] | undefined): SftpSettings {
+  return {
+    enabled: value?.enabled ?? true,
+    cwd_follow_mode: value?.cwd_follow_mode || "shell_integration",
   };
 }
 
@@ -123,6 +135,7 @@ export default function NewSessionPage() {
   const [x11Forwarding, setX11Forwarding] = useState(false);
   const [sshAlgorithms, setSshAlgorithms] =
     useState<SshAlgorithmPreferences>(DEFAULT_SSH_ALGORITHMS);
+  const [sftpSettings, setSftpSettings] = useState<SftpSettings>(DEFAULT_SFTP_SETTINGS);
 
   // Serial Settings States
   const [serialPortName, setSerialPortName] = useState("");
@@ -203,6 +216,7 @@ export default function NewSessionPage() {
           setSshBackspaceMode(found.backspace_mode || "del");
           setX11Forwarding(found.x11_forwarding ?? false);
           setSshAlgorithms(normalizeSshAlgorithms(found.ssh_algorithms));
+          setSftpSettings(normalizeSftpSettings(found.sftp));
         } else if (found.type === "telnet") {
           setHost(found.host || "");
           setTelnetPort(found.port || 23);
@@ -277,6 +291,7 @@ export default function NewSessionPage() {
     setSshBackspaceMode("del");
     setX11Forwarding(false);
     setSshAlgorithms({ ...DEFAULT_SSH_ALGORITHMS });
+    setSftpSettings({ ...DEFAULT_SFTP_SETTINGS });
     setSerialPortName("");
     setSerialPorts([]);
     setSerialPortsLoading(false);
@@ -618,6 +633,7 @@ export default function NewSessionPage() {
               network,
               post_login: postLogin,
               ssh_algorithms: sshAlgorithms,
+              sftp: sftpSettings,
               backspace_mode: sshBackspaceMode,
               x11_forwarding: x11Forwarding,
             }
@@ -956,6 +972,8 @@ export default function NewSessionPage() {
               setX11Forwarding={setX11Forwarding}
               sshAlgorithms={sshAlgorithms}
               setSshAlgorithms={setSshAlgorithms}
+              sftpSettings={sftpSettings}
+              setSftpSettings={setSftpSettings}
               connectionId={initialData?.id || editId}
             />
           </TabsContent>

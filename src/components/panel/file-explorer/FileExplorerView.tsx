@@ -117,9 +117,13 @@ function FileExplorer({
   const { t } = useTranslation();
   const { appSettings, updateUi } = useApp();
   const { enqueueDownloads, enqueueUploads } = useTransfer();
-  const canBrowseFiles = !!activeSessionId && activeSessionType === "SSH";
+  const hasSshSession = !!activeSessionId && activeSessionType === "SSH";
+  const [remoteFileBrowserEnabled, setRemoteFileBrowserEnabled] = useState<boolean | null>(null);
+  const canBrowseFiles = hasSshSession && remoteFileBrowserEnabled === true;
   const hasUnsupportedSession =
     !!activeSessionId && !!activeSessionType && activeSessionType !== "SSH";
+  const hasRemoteFileBrowserDisabled = hasSshSession && remoteFileBrowserEnabled === false;
+  const isResolvingRemoteFileBrowser = hasSshSession && remoteFileBrowserEnabled === null;
 
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [currentPath, setCurrentPath] = useState("");
@@ -361,20 +365,24 @@ function FileExplorer({
 
   // Resolve whether backend terminal-path tracking is available for this session.
   useEffect(() => {
-    if (!canBrowseFiles || !activeSessionId) {
+    if (!hasSshSession || !activeSessionId) {
       setCwdTrackingActive(false);
+      setRemoteFileBrowserEnabled(null);
       return;
     }
+    setRemoteFileBrowserEnabled(null);
     invoke<SessionInfo[]>("list_sessions")
       .then((sessions) => {
         const s = sessions.find((s) => s.id === activeSessionId);
         const active = s?.injection_active ?? false;
         setCwdTrackingActive(active);
+        setRemoteFileBrowserEnabled(s?.remote_file_browser_enabled ?? true);
       })
       .catch(() => {
         setCwdTrackingActive(false);
+        setRemoteFileBrowserEnabled(true);
       });
-  }, [activeSessionId, canBrowseFiles]);
+  }, [activeSessionId, hasSshSession]);
 
   useEffect(() => {
     const unlisten = listen<{ session_id: string; local_path: string; remote_path: string }>(
@@ -1890,6 +1898,24 @@ function FileExplorer({
                   <MdFolderOff className="text-xl block mx-auto mb-2" />
                   <div className="text-sm block mb-2">{t("fileExplorer.unsupportedSession")}</div>
                   <div>{t("fileExplorer.unsupportedSessionDesc")}</div>
+                </div>
+              ) : isResolvingRemoteFileBrowser ? (
+                <div
+                  className="text-center py-8 text-xs"
+                  style={{ color: "var(--df-text-dimmed)" }}
+                >
+                  {t("fileExplorer.loading")}
+                </div>
+              ) : hasRemoteFileBrowserDisabled ? (
+                <div
+                  className="text-center py-8 text-xs"
+                  style={{ color: "var(--df-text-dimmed)" }}
+                >
+                  <MdFolderOff className="text-xl block mx-auto mb-2" />
+                  <div className="text-sm block mb-2">
+                    {t("fileExplorer.remoteBrowserDisabled")}
+                  </div>
+                  <div>{t("fileExplorer.remoteBrowserDisabledDesc")}</div>
                 </div>
               ) : (
                 <>

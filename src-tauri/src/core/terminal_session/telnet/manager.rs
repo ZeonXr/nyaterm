@@ -34,6 +34,7 @@ pub async fn create_telnet_session(
         owner_window_label,
         ai_execution_profile: AiExecutionProfile::SendOnly,
         injection_active: false,
+        remote_file_browser_enabled: false,
     };
 
     let cwd: SharedCwd = Arc::new(tokio::sync::Mutex::new(None));

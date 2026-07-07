@@ -378,6 +378,7 @@ fn resolve_saved_ssh_config(
         proxy_jump,
         post_login,
         ssh_algorithms: conn.ssh_algorithms.clone(),
+        sftp: conn.sftp.clone(),
     })
 }
 

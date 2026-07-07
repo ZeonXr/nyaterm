@@ -1,4 +1,5 @@
 use super::client::{SshHandle, SshHandler, SshPostLoginConfig, SshStartupCommand};
+use crate::config::SftpCwdFollowMode;
 use crate::core::capture::OutputCaptureProcessor;
 use crate::core::input::remap_del_to_bs;
 use crate::core::ssh::osc::{self, OscStripper, ShellKind};
@@ -57,6 +58,142 @@ async fn detect_shell_type(handle: &mut client::Handle<SshHandler>) -> Option<Sh
         .flatten()
 }
 
+async fn exec_remote_command(
+    handle: &mut client::Handle<SshHandler>,
+    command: &str,
+    timeout_ms: u64,
+) -> AppResult<String> {
+    let fut = async {
+        let mut ch = handle.channel_open_session().await.map_err(|error| {
+            AppError::Channel(format!("Failed to open exec channel: {}", error))
+        })?;
+        ch.exec(true, command).await.map_err(|error| {
+            AppError::Channel(format!("Failed to execute remote command: {}", error))
+        })?;
+
+        let mut output = String::new();
+        let mut exit_status = None;
+        while let Some(msg) = ch.wait().await {
+            match msg {
+                ChannelMsg::Data { ref data } | ChannelMsg::ExtendedData { ref data, .. } => {
+                    output.push_str(&String::from_utf8_lossy(data));
+                }
+                ChannelMsg::ExitStatus {
+                    exit_status: status,
+                } => {
+                    exit_status = Some(status);
+                }
+                _ => {}
+            }
+        }
+
+        match exit_status.unwrap_or(0) {
+            0 => Ok(output),
+            status => Err(AppError::Channel(format!(
+                "Remote command exited with status {status}: {output}"
+            ))),
+        }
+    };
+
+    timeout(Duration::from_millis(timeout_ms), fut)
+        .await
+        .map_err(|_| AppError::Channel("Remote command timed out".to_string()))?
+}
+
+fn sh_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+fn remote_install_command(shell: ShellKind) -> Option<String> {
+    let script = osc::persistent_script(shell)?;
+    let block = osc::rc_managed_block(shell)?;
+    let script_path = osc::persistent_script_path(shell)?;
+    let rc_path = osc::rc_file_path(shell)?;
+
+    Some(format!(
+        r#"set -eu
+script_path={script_path}
+rc_path={rc_path}
+mkdir -p "$HOME/.config/nyaterm"
+case "$rc_path" in */*) mkdir -p "${{rc_path%/*}}" ;; esac
+script_tmp="${{script_path}}.tmp.$$"
+cat > "$script_tmp" <<'NYATERM_SCRIPT_EOF'
+{script}
+NYATERM_SCRIPT_EOF
+if [ ! -f "$script_path" ] || ! cmp -s "$script_tmp" "$script_path"; then
+  mv "$script_tmp" "$script_path"
+else
+  rm -f "$script_tmp"
+fi
+block_tmp="${{script_path}}.block.$$"
+cat > "$block_tmp" <<'NYATERM_BLOCK_EOF'
+{block}
+NYATERM_BLOCK_EOF
+rc_tmp="${{rc_path}}.tmp.$$"
+start={start}
+end={end}
+if [ -f "$rc_path" ] && grep -F "$start" "$rc_path" >/dev/null 2>&1 && grep -F "$end" "$rc_path" >/dev/null 2>&1; then
+  NYATERM_BLOCK_FILE="$block_tmp" awk -v start="$start" -v end="$end" '
+    $0 == start {{
+      if (!done) {{
+        while ((getline line < ENVIRON["NYATERM_BLOCK_FILE"]) > 0) print line
+        close(ENVIRON["NYATERM_BLOCK_FILE"])
+        done=1
+      }}
+      skip=1
+      next
+    }}
+    $0 == end {{ skip=0; next }}
+    !skip {{ print }}
+    END {{
+      if (!done) {{
+        if (NR > 0) print ""
+        while ((getline line < ENVIRON["NYATERM_BLOCK_FILE"]) > 0) print line
+      }}
+    }}
+  ' "$rc_path" > "$rc_tmp"
+else
+  if [ -f "$rc_path" ]; then
+    cat "$rc_path" > "$rc_tmp"
+    if [ -s "$rc_tmp" ]; then printf '\n' >> "$rc_tmp"; fi
+  else
+    : > "$rc_tmp"
+  fi
+  cat "$block_tmp" >> "$rc_tmp"
+fi
+if [ ! -f "$rc_path" ] || ! cmp -s "$rc_tmp" "$rc_path"; then
+  if [ -f "$rc_path" ] && [ ! -f "$rc_path.nyaterm.bak" ]; then
+    cp "$rc_path" "$rc_path.nyaterm.bak" 2>/dev/null || true
+  fi
+  mv "$rc_tmp" "$rc_path"
+else
+  rm -f "$rc_tmp"
+fi
+rm -f "$block_tmp"
+"#,
+        script_path = script_path,
+        rc_path = rc_path,
+        script = script,
+        block = block,
+        start = sh_single_quote(osc::MANAGED_BLOCK_START),
+        end = sh_single_quote(osc::MANAGED_BLOCK_END),
+    ))
+}
+
+async fn install_remote_shell_integration(
+    handle: &mut client::Handle<SshHandler>,
+    shell: ShellKind,
+) -> AppResult<()> {
+    let Some(command) = remote_install_command(shell) else {
+        return Err(AppError::Config(format!(
+            "No persistent shell integration available for {shell:?}"
+        )));
+    };
+    exec_remote_command(handle, &command, 3000)
+        .await
+        .map(|_| ())
+}
+
 /// Opens a PTY shell channel and detects the remote shell type.
 ///
 /// Returns `(channel, Option<injection_script>, ready_marker)`.
@@ -67,6 +204,7 @@ pub(super) async fn open_shell_channel(
     handle: &mut client::Handle<SshHandler>,
     session_id: &str,
     x11_fake_cookie_hex: Option<&str>,
+    cwd_follow_mode: SftpCwdFollowMode,
 ) -> AppResult<(
     russh::Channel<client::Msg>,
     Option<String>,
@@ -107,31 +245,64 @@ pub(super) async fn open_shell_channel(
     let ready_marker = osc::build_ready_marker(session_id);
 
     let mut detected_shell = None;
-    let injection_script = match detect_shell_type(handle).await {
-        Some(shell_kind) => {
-            detected_shell = Some(shell_kind);
-            let script = osc::injection_script(shell_kind, &ready_marker);
-            if script.is_some() {
-                tracing::debug!(
-                    session_id = %session_id,
-                    shell = ?shell_kind,
-                    "Will inject OSC 7 hook after initial output"
-                );
-            } else {
-                tracing::debug!(
-                    session_id = %session_id,
-                    shell = ?shell_kind,
-                    "Shell detected but no injection script available — skipping"
-                );
-            }
-            script
-        }
-        None => {
+    let injection_script = match cwd_follow_mode {
+        SftpCwdFollowMode::Off => {
             tracing::debug!(
                 session_id = %session_id,
-                "Shell detection returned no output — skipping OSC 7 injection"
+                "SSH shell integration disabled by connection settings"
             );
             None
+        }
+        SftpCwdFollowMode::ShellIntegration | SftpCwdFollowMode::RcFile => {
+            match detect_shell_type(handle).await {
+                Some(shell_kind) => {
+                    detected_shell = Some(shell_kind);
+                    let script = if cwd_follow_mode == SftpCwdFollowMode::RcFile {
+                        match install_remote_shell_integration(handle, shell_kind).await {
+                            Ok(()) => {
+                                tracing::debug!(
+                                    session_id = %session_id,
+                                    shell = ?shell_kind,
+                                    "Remote shell integration files are installed"
+                                );
+                                osc::activation_script(shell_kind, &ready_marker)
+                            }
+                            Err(error) => {
+                                tracing::warn!(
+                                    session_id = %session_id,
+                                    shell = ?shell_kind,
+                                    %error,
+                                    "Failed to install remote shell integration files; falling back to session injection"
+                                );
+                                osc::injection_script(shell_kind, &ready_marker)
+                            }
+                        }
+                    } else {
+                        osc::injection_script(shell_kind, &ready_marker)
+                    };
+                    if script.is_some() {
+                        tracing::debug!(
+                            session_id = %session_id,
+                            shell = ?shell_kind,
+                            "Will inject OSC 7 hook after initial output"
+                        );
+                    } else {
+                        tracing::debug!(
+                            session_id = %session_id,
+                            shell = ?shell_kind,
+                            "Shell detected but no injection script available — skipping"
+                        );
+                    }
+                    script
+                }
+                None => {
+                    tracing::debug!(
+                        session_id = %session_id,
+                        "Shell detection returned no output — skipping OSC 7 injection"
+                    );
+                    None
+                }
+            }
         }
     };
 

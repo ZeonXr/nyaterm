@@ -1460,6 +1460,7 @@ mod tests {
                     owner_window_label: None,
                     ai_execution_profile: AiExecutionProfile::SendOnly,
                     injection_active: false,
+                    remote_file_browser_enabled: false,
                 },
                 cmd_tx,
                 ssh_config: None,

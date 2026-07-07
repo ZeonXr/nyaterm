@@ -227,7 +227,7 @@ mod tests {
     };
     use crate::config::{
         AiExecutionProfile, ConnectionNetwork, ConnectionType, Group, SavedConnection,
-        SessionsConfig,
+        SessionsConfig, SftpSettings,
     };
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -254,6 +254,7 @@ mod tests {
             }),
             post_login: None,
             ssh_algorithms: None,
+            sftp: SftpSettings::default(),
             created_at_ms: None,
             updated_at_ms: None,
             last_used_at_ms: None,
@@ -288,6 +289,7 @@ mod tests {
             }),
             post_login: None,
             ssh_algorithms: None,
+            sftp: SftpSettings::default(),
             created_at_ms: None,
             updated_at_ms: None,
             last_used_at_ms: None,
@@ -312,6 +314,7 @@ mod tests {
             network: None,
             post_login: None,
             ssh_algorithms: None,
+            sftp: SftpSettings::default(),
             created_at_ms: None,
             updated_at_ms: None,
             last_used_at_ms: None,

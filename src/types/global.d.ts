@@ -42,6 +42,8 @@ export interface SessionInfo {
   ai_execution_profile: AIExecutionProfile;
   /** True when backend terminal-path tracking is available for this session. */
   injection_active: boolean;
+  /** True when the remote file browser is enabled for this session. */
+  remote_file_browser_enabled: boolean;
 }
 
 /** Leaf node representing one terminal session inside a workspace tab. */
@@ -103,6 +105,7 @@ export interface SshConfig {
   proxy_jump?: SshConfig | null;
   post_login?: { command: string; delay_ms: number } | null;
   ssh_algorithms?: SshAlgorithmPreferences | null;
+  sftp?: SftpSettings;
 }
 
 /** SSH authentication: none, password, or private key (PEM content). */
@@ -199,6 +202,13 @@ export interface SshAlgorithmPreferences {
   host_keys: string[];
 }
 
+export type SftpCwdFollowMode = "off" | "shell_integration" | "rc_file";
+
+export interface SftpSettings {
+  enabled: boolean;
+  cwd_follow_mode: SftpCwdFollowMode;
+}
+
 export type AlgorithmRisk = "modern" | "legacy" | "insecure";
 
 export interface AlgorithmOption {
@@ -237,6 +247,7 @@ export interface SavedConnection {
   network?: ConnectionNetwork;
   post_login?: ConnectionPostLogin;
   ssh_algorithms?: SshAlgorithmPreferences;
+  sftp?: SftpSettings;
   /** SSH-specific fields (present when type === "ssh"). */
   host?: string;
   port?: number;

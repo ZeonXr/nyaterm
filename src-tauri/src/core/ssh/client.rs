@@ -1,4 +1,4 @@
-use crate::config::{SshAlgorithmMode, SshAlgorithmPreferences};
+use crate::config::{SftpSettings, SshAlgorithmMode, SshAlgorithmPreferences};
 use crate::error::{AppError, AppResult};
 use russh::client;
 use russh::keys::{Algorithm, EcdsaCurve, HashAlg, PublicKeyBase64};
@@ -40,6 +40,8 @@ pub struct SshConfig {
     pub post_login: Option<SshPostLoginConfig>,
     #[serde(default)]
     pub ssh_algorithms: Option<SshAlgorithmPreferences>,
+    #[serde(default)]
+    pub sftp: SftpSettings,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]

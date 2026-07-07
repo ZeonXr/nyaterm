@@ -180,6 +180,206 @@ pub fn injection_script(shell: ShellKind, ready_marker: &str) -> Option<String> 
     }
 }
 
+pub fn activation_script(shell: ShellKind, ready_marker: &str) -> Option<String> {
+    let ready_printf = ready_marker
+        .replace('\\', "\\\\")
+        .replace('\x1b', "\\033")
+        .replace('\x07', "\\007")
+        .replace('\'', "'\\''");
+
+    match shell {
+        ShellKind::Bash => Some(format!(
+            " NYATERM_PRUNE_HISTORY=1; NYATERM_READY_PENDING=1; export NYATERM_INJ=1; export NYATERM_READY_MARKER=\"$(printf '{}')\"; [ -r \"$HOME/.config/nyaterm/shell-integration.bash\" ] && . \"$HOME/.config/nyaterm/shell-integration.bash\"; __nyaterm_install_prompt 2>/dev/null; printf '' 2>/dev/null\n",
+            ready_printf
+        )),
+        ShellKind::Zsh => Some(format!(
+            " fc -p /dev/null 2>/dev/null\n NYATERM_READY_PENDING=1; export NYATERM_INJ=1; export NYATERM_READY_MARKER=\"$(printf '{}')\"; [ -r \"$HOME/.config/nyaterm/shell-integration.zsh\" ] && . \"$HOME/.config/nyaterm/shell-integration.zsh\"; __nyaterm_install_prompt 2>/dev/null; fc -P 2>/dev/null\n printf '' 2>/dev/null\n",
+            ready_printf
+        )),
+        ShellKind::Fish => Some(format!(
+            " set fish_private_mode 1 2>/dev/null\n set -g NYATERM_READY_PENDING 1; set -gx NYATERM_INJ 1; set -gx NYATERM_READY_MARKER (printf '{}'); if test -r \"$HOME/.config/nyaterm/shell-integration.fish\"; source \"$HOME/.config/nyaterm/shell-integration.fish\"; end; __nyaterm_install_prompt 2>/dev/null; set -e fish_private_mode 2>/dev/null\n printf '' 2>/dev/null\n",
+            ready_printf
+        )),
+        ShellKind::PosixSh | ShellKind::Unknown => None,
+    }
+}
+
+pub fn persistent_script(shell: ShellKind) -> Option<&'static str> {
+    match shell {
+        ShellKind::Bash => Some(BASH_PERSISTENT_SCRIPT),
+        ShellKind::Zsh => Some(ZSH_PERSISTENT_SCRIPT),
+        ShellKind::Fish => Some(FISH_PERSISTENT_SCRIPT),
+        ShellKind::PosixSh | ShellKind::Unknown => None,
+    }
+}
+
+pub fn persistent_script_path(shell: ShellKind) -> Option<&'static str> {
+    match shell {
+        ShellKind::Bash => Some("$HOME/.config/nyaterm/shell-integration.bash"),
+        ShellKind::Zsh => Some("$HOME/.config/nyaterm/shell-integration.zsh"),
+        ShellKind::Fish => Some("$HOME/.config/nyaterm/shell-integration.fish"),
+        ShellKind::PosixSh | ShellKind::Unknown => None,
+    }
+}
+
+pub fn rc_file_path(shell: ShellKind) -> Option<&'static str> {
+    match shell {
+        ShellKind::Bash => Some("$HOME/.bashrc"),
+        ShellKind::Zsh => Some("$HOME/.zshrc"),
+        ShellKind::Fish => Some("$HOME/.config/fish/conf.d/nyaterm-shell-integration.fish"),
+        ShellKind::PosixSh | ShellKind::Unknown => None,
+    }
+}
+
+pub fn rc_managed_block(shell: ShellKind) -> Option<String> {
+    let source_path = persistent_script_path(shell)?;
+    let body = match shell {
+        ShellKind::Bash | ShellKind::Zsh => format!(
+            "if [ -r \"{}\" ]; then\n  . \"{}\"\nfi",
+            source_path, source_path
+        ),
+        ShellKind::Fish => format!(
+            "if test -r \"{}\"\n  source \"{}\"\nend",
+            source_path, source_path
+        ),
+        ShellKind::PosixSh | ShellKind::Unknown => return None,
+    };
+
+    Some(format!(
+        "{MANAGED_BLOCK_START}\n{body}\n{MANAGED_BLOCK_END}"
+    ))
+}
+
+#[cfg(test)]
+pub fn replace_managed_block(existing: &str, block: &str) -> String {
+    let mut output = Vec::new();
+    let mut lines = existing.lines();
+    let mut replaced = false;
+
+    while let Some(line) = lines.next() {
+        if line == MANAGED_BLOCK_START {
+            output.extend(block.lines().map(str::to_string));
+            replaced = true;
+            for skipped in lines.by_ref() {
+                if skipped == MANAGED_BLOCK_END {
+                    break;
+                }
+            }
+        } else {
+            output.push(line.to_string());
+        }
+    }
+
+    if !replaced {
+        if !output.is_empty() {
+            output.push(String::new());
+        }
+        output.extend(block.lines().map(str::to_string));
+    }
+
+    let mut result = output.join("\n");
+    result.push('\n');
+    result
+}
+
+pub const MANAGED_BLOCK_START: &str = "# >>> nyaterm shell integration >>>";
+pub const MANAGED_BLOCK_END: &str = "# <<< nyaterm shell integration <<<";
+
+const BASH_PERSISTENT_SCRIPT: &str = concat!(
+    "# nyaterm shell integration v1\n",
+    "__nyaterm_host(){ hostname 2>/dev/null || printf localhost; }\n",
+    "__nyaterm_prune_history(){\n",
+    "  [ -n \"${NYATERM_PRUNE_HISTORY:-}\" ] || return 0\n",
+    "  unset NYATERM_PRUNE_HISTORY\n",
+    "  local hline\n",
+    "  hline=\"$(HISTTIMEFORMAT= history 1 2>/dev/null || true)\"\n",
+    "  case \"$hline\" in\n",
+    "    (*NYATERM_PRUNE_HISTORY*|*NYATERM_INJ*|*__nyaterm_install_prompt*|*NyaTermReady*)\n",
+    "      if [[ \"$hline\" =~ ^[[:space:]]*([0-9]+) ]]; then history -d \"${BASH_REMATCH[1]}\" 2>/dev/null || true; fi\n",
+    "      ;;\n",
+    "  esac\n",
+    "}\n",
+    "__nyaterm_emit_command(){\n",
+    "  local histcmd=\"${HISTCMD-}\"\n",
+    "  if [ -n \"$histcmd\" ] && [ \"${NYATERM_LAST_HISTCMD-}\" != \"$histcmd\" ]; then\n",
+    "    NYATERM_LAST_HISTCMD=\"$histcmd\"\n",
+    "    local cmd; cmd=\"$(fc -ln -1 2>/dev/null)\"\n",
+    "    if [ -n \"$cmd\" ] && command -v base64 >/dev/null 2>&1; then\n",
+    "      local b64; b64=\"$(printf '%s' \"$cmd\" | base64 | tr -d '\\r\\n')\"\n",
+    "      printf '\\033]7777;NyaTermCommand:%s\\007' \"$b64\"\n",
+    "    fi\n",
+    "  fi\n",
+    "}\n",
+    "__nyaterm_prompt(){\n",
+    "  __nyaterm_prune_history\n",
+    "  __nyaterm_emit_command\n",
+    "  if [ -n \"${NYATERM_READY_PENDING:-}\" ]; then unset NYATERM_READY_PENDING; printf '%s' \"${NYATERM_READY_MARKER-}\"; fi\n",
+    "  printf '\\033]7;file://%s%s\\007' \"$(__nyaterm_host)\" \"$PWD\"\n",
+    "}\n",
+    "__nyaterm_install_prompt(){\n",
+    "  NYATERM_LAST_HISTCMD=\"${HISTCMD-}\"\n",
+    "  local decl\n",
+    "  decl=\"$(declare -p PROMPT_COMMAND 2>/dev/null || true)\"\n",
+    "  if [[ \"$decl\" =~ ^declare\\ -[^[:space:]]*a[^[:space:]]*\\ PROMPT_COMMAND= ]]; then\n",
+    "    local f\n",
+    "    for f in \"${PROMPT_COMMAND[@]}\"; do [ \"$f\" = __nyaterm_prompt ] && return 0; done\n",
+    "    PROMPT_COMMAND=(__nyaterm_prompt \"${PROMPT_COMMAND[@]}\")\n",
+    "  else\n",
+    "    case \"${PROMPT_COMMAND-}\" in (*__nyaterm_prompt*) ;; (*) PROMPT_COMMAND=\"__nyaterm_prompt${PROMPT_COMMAND:+; $PROMPT_COMMAND}\" ;; esac\n",
+    "  fi\n",
+    "}\n"
+);
+
+const ZSH_PERSISTENT_SCRIPT: &str = concat!(
+    "# nyaterm shell integration v1\n",
+    "__nyaterm_host(){ hostname 2>/dev/null || printf localhost; }\n",
+    "__nyaterm_emit(){\n",
+    "  if [ -n \"${NYATERM_READY_PENDING:-}\" ]; then unset NYATERM_READY_PENDING; printf '%s' \"${NYATERM_READY_MARKER-}\"; fi\n",
+    "  printf '\\033]7;file://%s%s\\007' \"$(__nyaterm_host)\" \"$PWD\"\n",
+    "}\n",
+    "__nyaterm_preexec(){\n",
+    "  if [ -n \"$1\" ] && command -v base64 >/dev/null 2>&1; then\n",
+    "    local b64; b64=\"$(printf '%s' \"$1\" | base64 | tr -d '\\r\\n')\"\n",
+    "    printf '\\033]7777;NyaTermCommand:%s\\007' \"$b64\"\n",
+    "  fi\n",
+    "}\n",
+    "__nyaterm_install_prompt(){\n",
+    "  autoload -Uz add-zsh-hook 2>/dev/null || true\n",
+    "  typeset -ga precmd_functions preexec_functions\n",
+    "  [[ \" ${precmd_functions[*]} \" == *\" __nyaterm_emit \"* ]] || precmd_functions+=(__nyaterm_emit)\n",
+    "  [[ \" ${preexec_functions[*]} \" == *\" __nyaterm_preexec \"* ]] || preexec_functions+=(__nyaterm_preexec)\n",
+    "}\n"
+);
+
+const FISH_PERSISTENT_SCRIPT: &str = concat!(
+    "# nyaterm shell integration v1\n",
+    "function __nyaterm_emit\n",
+    "  if set -q NYATERM_READY_PENDING\n",
+    "    set -e NYATERM_READY_PENDING\n",
+    "    printf '%s' \"$NYATERM_READY_MARKER\"\n",
+    "  end\n",
+    "  printf '\\033]7;file://%s%s\\007' (hostname) $PWD\n",
+    "end\n",
+    "function __nyaterm_preexec\n",
+    "  if test -n \"$argv[1]\"; and command -sq base64\n",
+    "    set -l b64 (printf '%s' \"$argv[1]\" | base64 | tr -d '\\r\\n')\n",
+    "    if test -n \"$b64\"\n",
+    "      printf '\\033]7777;NyaTermCommand:%s\\007' \"$b64\"\n",
+    "    end\n",
+    "  end\n",
+    "end\n",
+    "function __nyaterm_install_prompt\n",
+    "  functions -e __nyaterm_emit_event 2>/dev/null\n",
+    "  functions -e __nyaterm_preexec_event 2>/dev/null\n",
+    "  function __nyaterm_emit_event --on-event fish_prompt\n",
+    "    __nyaterm_emit\n",
+    "  end\n",
+    "  function __nyaterm_preexec_event --on-event fish_preexec\n",
+    "    __nyaterm_preexec $argv\n",
+    "  end\n",
+    "end\n"
+);
+
 // ---------------------------------------------------------------------------
 // Streaming OSC stripper
 // ---------------------------------------------------------------------------
@@ -376,7 +576,10 @@ fn parse_command_payload(payload: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{OscStripper, ShellKind, build_ready_marker, injection_script};
+    use super::{
+        MANAGED_BLOCK_END, MANAGED_BLOCK_START, OscStripper, ShellKind, build_ready_marker,
+        injection_script, persistent_script, rc_managed_block, replace_managed_block,
+    };
     use base64::Engine;
     use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
@@ -394,6 +597,35 @@ mod tests {
         );
         assert!(!script.contains("set +o history"));
         assert!(!script.contains("set -o history"));
+    }
+
+    #[test]
+    fn managed_block_is_added_replaced_and_deduplicated() {
+        let block = rc_managed_block(ShellKind::Bash).expect("bash block");
+        let added = replace_managed_block("alias ll='ls -la'\n", &block);
+
+        assert!(added.contains("alias ll='ls -la'"));
+        assert_eq!(added.matches(MANAGED_BLOCK_START).count(), 1);
+        assert_eq!(added.matches(MANAGED_BLOCK_END).count(), 1);
+
+        let replacement = format!("{MANAGED_BLOCK_START}\nnew body\n{MANAGED_BLOCK_END}");
+        let replaced = replace_managed_block(&added, &replacement);
+
+        assert!(replaced.contains("new body"));
+        assert!(!replaced.contains("shell-integration.bash"));
+        assert_eq!(replaced.matches(MANAGED_BLOCK_START).count(), 1);
+    }
+
+    #[test]
+    fn fish_persistent_script_requires_explicit_activation() {
+        let script = persistent_script(ShellKind::Fish).expect("fish persistent script");
+        let install_pos = script
+            .find("function __nyaterm_install_prompt")
+            .expect("install function");
+
+        assert!(!script[..install_pos].contains("--on-event"));
+        assert!(script[install_pos..].contains("--on-event fish_prompt"));
+        assert!(script[install_pos..].contains("--on-event fish_preexec"));
     }
 
     #[test]

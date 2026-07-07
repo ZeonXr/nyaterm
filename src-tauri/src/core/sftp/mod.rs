@@ -220,6 +220,11 @@ async fn get_or_create_auto_fs(
         let session = sessions.get(session_id).ok_or_else(|| {
             AppError::SessionNotFound(format!("Session '{}' not found", session_id))
         })?;
+        if !session.info.remote_file_browser_enabled {
+            return Err(AppError::Config(
+                "Remote file browser is disabled for this SSH connection".to_string(),
+            ));
+        }
         if let Some(ref fs) = session.remote_fs {
             return Ok(fs.clone());
         }
@@ -604,4 +609,48 @@ pub async fn upload_local_directory(
         transfer_id,
     )
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::get_home_dir;
+    use crate::config::AiExecutionProfile;
+    use crate::core::{SessionCommand, SessionHandle, SessionInfo, SessionManager, SessionType};
+    use std::sync::Arc;
+    use tokio::sync::{Mutex, mpsc};
+
+    #[tokio::test]
+    async fn disabled_remote_file_browser_rejects_sftp_commands() {
+        let manager = Arc::new(SessionManager::new());
+        let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<SessionCommand>();
+        manager
+            .add_session(SessionHandle {
+                info: SessionInfo {
+                    id: "ssh-disabled-files".to_string(),
+                    name: "ssh-disabled-files".to_string(),
+                    session_type: SessionType::SSH,
+                    connected: true,
+                    owner_window_label: None,
+                    ai_execution_profile: AiExecutionProfile::Posix,
+                    injection_active: true,
+                    remote_file_browser_enabled: false,
+                },
+                cmd_tx,
+                ssh_config: None,
+                ssh_handle: None,
+                cwd: Arc::new(Mutex::new(None)),
+                remote_fs: None,
+            })
+            .await;
+
+        let error = get_home_dir(manager, "ssh-disabled-files")
+            .await
+            .expect_err("remote file browser should be blocked");
+
+        assert!(
+            error
+                .to_string()
+                .contains("Remote file browser is disabled")
+        );
+    }
 }

@@ -1,5 +1,7 @@
 use super::*;
-use crate::config::{ConnectionAuth, ConnectionType, Group, SavedConnection, SessionsConfig};
+use crate::config::{
+    ConnectionAuth, ConnectionType, Group, SavedConnection, SessionsConfig, SftpSettings,
+};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -54,6 +56,7 @@ fn sample_connection(id: &str, group_id: Option<&str>, sort_order: i32) -> Saved
         network: None,
         post_login: None,
         ssh_algorithms: None,
+        sftp: SftpSettings::default(),
         created_at_ms: None,
         updated_at_ms: None,
         last_used_at_ms: None,
