@@ -257,7 +257,7 @@ export default function TerminalGutter({
   const columnGap = showLineNumbers && showTimestamps ? 8 : 0;
   const innerRightPadding = 8;
   const separatorGap = 10;
-  const gutterWidth = tsWidth + lineNumWidth + columnGap + innerRightPadding;
+  const gutterWidth = tsWidth + lineNumWidth + columnGap + innerRightPadding + separatorGap;
 
   return (
     <div
@@ -265,10 +265,10 @@ export default function TerminalGutter({
       style={{
         boxSizing: "content-box",
         width: gutterWidth,
-        marginRight: separatorGap,
         paddingTop: layout.topPadding,
-        borderColor: "var(--df-border)",
-        backgroundColor: "var(--df-bg-terminal)",
+        borderColor:
+          "color-mix(in srgb, var(--df-terminal-fg, var(--df-text)) 18%, var(--df-terminal-bg, var(--df-bg-terminal)))",
+        backgroundColor: "var(--df-terminal-bg, var(--df-bg-terminal))",
         fontFamily: layout.fontFamily,
         fontSize: layout.fontSize,
       }}
@@ -281,7 +281,7 @@ export default function TerminalGutter({
             height: layout.rowHeight,
             lineHeight: `${layout.rowHeight}px`,
             columnGap,
-            paddingRight: innerRightPadding,
+            paddingRight: innerRightPadding + separatorGap,
           }}
         >
           {showTimestamps && (
@@ -289,7 +289,7 @@ export default function TerminalGutter({
               className="inline-block text-right"
               style={{
                 width: tsWidth,
-                color: "var(--df-text-muted)",
+                color: "var(--df-terminal-fg, var(--df-text))",
                 opacity: 0.85,
               }}
             >
@@ -302,7 +302,7 @@ export default function TerminalGutter({
               className="inline-block text-right"
               style={{
                 width: lineNumWidth,
-                color: "var(--df-text-dimmed)",
+                color: "var(--df-terminal-fg, var(--df-text))",
                 opacity: 0.7,
               }}
             >

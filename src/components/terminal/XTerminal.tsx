@@ -2329,8 +2329,13 @@ export default function XTerminal({
     [sessionType, t],
   );
 
+  const terminalBackground = "var(--df-terminal-bg, var(--df-bg-terminal))";
+
   return (
-    <div className="h-full w-full relative flex" style={{ display: visible ? "flex" : "none" }}>
+    <div
+      className="h-full w-full relative flex"
+      style={{ display: visible ? "flex" : "none", backgroundColor: terminalBackground }}
+    >
       {showGutter && terminalReady && (
         <TerminalGutter
           terminalRef={terminalRef}
@@ -2343,15 +2348,26 @@ export default function XTerminal({
           suspended={performanceMode === "overloaded" || !visible}
         />
       )}
-      <div className="flex-1 min-w-0 h-full relative">
+      <div
+        className="flex-1 min-w-0 h-full relative"
+        style={{ backgroundColor: terminalBackground }}
+      >
         <TerminalContextMenu
           terminalRef={terminalRef}
           onFind={doFind}
           onPasteText={handlePasteText}
           onPasteClipboard={pasteClipboard}
         >
-          <div className={`h-full w-full ${showContentPadding ? "pl-2" : ""}`}>
-            <div ref={containerRef} data-terminal-root="true" className="h-full w-full" />
+          <div
+            className={`h-full w-full ${showContentPadding ? "pl-2" : ""}`}
+            style={{ backgroundColor: terminalBackground }}
+          >
+            <div
+              ref={containerRef}
+              data-terminal-root="true"
+              className="h-full w-full"
+              style={{ backgroundColor: terminalBackground }}
+            />
           </div>
         </TerminalContextMenu>
 

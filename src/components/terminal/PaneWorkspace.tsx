@@ -177,7 +177,7 @@ function PaneNodeView({
       } ${showChrome && isActive ? "ring-1 ring-primary/60" : ""}`}
       style={{
         borderColor: showChrome ? "var(--df-border)" : undefined,
-        backgroundColor: "var(--df-bg-terminal)",
+        backgroundColor: "var(--df-terminal-bg, var(--df-bg-terminal))",
       }}
       onMouseDown={() => onActivatePane(node.id)}
     >

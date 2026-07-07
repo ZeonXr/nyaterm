@@ -55,6 +55,13 @@ export function applyThemeToDOM(colors: ThemeColors) {
   root.setProperty("--df-accent", colors.accent);
 }
 
+/** Inject terminal theme colors used by terminal-adjacent UI. */
+export function applyTerminalThemeToDOM(colors: ThemeColors["terminal"]) {
+  const root = document.documentElement.style;
+  root.setProperty("--df-terminal-bg", colors.background);
+  root.setProperty("--df-terminal-fg", colors.foreground);
+}
+
 /** Provides theme, themeName, setTheme. Syncs with appSettings.appearance.theme from backend. */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { appSettings, updateAppSettings } = useApp();
@@ -80,6 +87,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(THEME_CACHE_KEY, current.id);
     } catch {}
   }, [current]);
+
+  useEffect(() => {
+    applyTerminalThemeToDOM(resolvedTerminalTheme.colors.terminal);
+  }, [resolvedTerminalTheme]);
 
   // Sync UI theme from backend
   useEffect(() => {
