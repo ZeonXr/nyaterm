@@ -244,6 +244,8 @@ export default function XTerminal({
     [appearance, terminalTheme.colors.terminal],
   );
   const terminalTransparencyEnabled = isTerminalTransparencyEnabled(appearance);
+  const terminalLifecycleStateRef = useRef({ sessionId, terminalTransparencyEnabled });
+  terminalLifecycleStateRef.current = { sessionId, terminalTransparencyEnabled };
   const showLineNumbers = terminalSettings.show_line_numbers;
   const showTimestamps = terminalSettings.show_timestamps;
   const showTimestampMilliseconds = terminalSettings.show_timestamp_milliseconds ?? false;
@@ -2097,6 +2099,13 @@ export default function XTerminal({
       skippedOutputCharsRef.current = 0;
       outputWriteInFlightRef.current = false;
       outputWriteQueueRef.current = Promise.resolve();
+      const latestLifecycleState = terminalLifecycleStateRef.current;
+      if (
+        latestLifecycleState.sessionId === sessionId &&
+        latestLifecycleState.terminalTransparencyEnabled !== terminalTransparencyEnabled
+      ) {
+        preservedReconnectContentRef.current = serializeTerminalText(terminal);
+      }
       terminal.dispose();
       terminalRef.current = null;
       setTerminalInstance(null);
@@ -2104,7 +2113,7 @@ export default function XTerminal({
       registerSearchAddon(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, terminalTransparencyEnabled]);
 
   // Appearance, theme, and interaction settings sync.
   // Declared AFTER the terminal creation effect so effects from these hooks
