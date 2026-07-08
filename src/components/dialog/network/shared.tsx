@@ -182,7 +182,7 @@ export function ConnectionCombobox({
   }, [options, t]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -217,7 +217,7 @@ export function ConnectionCombobox({
       >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList className="max-h-72">
+          <CommandList className="terminal-scroll max-h-72 overscroll-contain">
             <CommandEmpty>{emptyText}</CommandEmpty>
             {clearLabel ? (
               <CommandGroup className="p-0">
