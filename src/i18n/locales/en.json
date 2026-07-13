@@ -1131,6 +1131,8 @@
     "deleteFailed": "Delete failed: {{error}}",
     "deleteFolder": "Delete Folder",
     "deleteFolderConfirm": "Delete folder '{{name}}' and all contents?",
+    "deleteSelected": "Delete Selected",
+    "deleteSelectedConfirm": "Delete {{count}} selected connections? This can't be undone.",
     "description": "Description",
     "edit": "Edit",
     "filter": "Filter...",

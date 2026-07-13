@@ -1131,6 +1131,8 @@
     "deleteFailed": "删除连接失败：{{error}}",
     "deleteFolder": "删除文件夹",
     "deleteFolderConfirm": "确定要删除文件夹「{{name}}」及其所有内容吗？",
+    "deleteSelected": "删除所选",
+    "deleteSelectedConfirm": "确定要删除选中的 {{count}} 个连接吗？此操作不可撤销。",
     "description": "描述",
     "edit": "编辑",
     "filter": "筛选...",
