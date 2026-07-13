@@ -1954,6 +1954,11 @@
     "duplicateFailed": "Duplicate failed",
     "duplicateWithCommand": "Duplicate and Run Command",
     "ipCopied": "IP address copied",
+    "lockTab": "Lock Tab",
+    "lockToggleFailed": "Failed to update tab lock",
+    "locked": "Locked",
+    "lockedCloseBlocked": "Unlock this tab before closing it",
+    "lockedTabsSkipped": "Locked tabs were skipped",
     "multiplexSsh": "Reuse SSH Connection",
     "multiplexSshFailed": "Failed to reuse SSH channel",
     "multiplexSshWithCommand": "Reuse SSH Connection and Run Command",
@@ -1976,6 +1981,7 @@
     "splitVertical": "Split Vertical",
     "sshAddressCopied": "SSH address copied",
     "sshAdvanced": "SSH Advanced",
+    "unlockTab": "Unlock Tab",
     "unsplit": "Merge All Panes"
   },
   "temporarySsh": {

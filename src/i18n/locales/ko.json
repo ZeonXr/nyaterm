@@ -1934,6 +1934,11 @@
     "duplicateFailed": "복제 실패",
     "duplicateWithCommand": "복제 및 명령 실행",
     "ipCopied": "IP 주소가 복사되었습니다",
+    "lockTab": "탭 잠금",
+    "lockToggleFailed": "탭 잠금 상태를 업데이트하지 못했습니다",
+    "locked": "잠김",
+    "lockedCloseBlocked": "이 탭을 닫으려면 먼저 잠금을 해제하세요",
+    "lockedTabsSkipped": "잠긴 탭은 건너뛰었습니다",
     "multiplexSsh": "SSH 연결 재사용",
     "multiplexSshFailed": "SSH 채널을 재사용하지 못했습니다",
     "multiplexSshWithCommand": "SSH 연결 재사용 및 명령 실행",
@@ -1956,6 +1961,7 @@
     "splitVertical": "세로로 분할",
     "sshAddressCopied": "SSH 주소가 복사되었습니다",
     "sshAdvanced": "SSH 고급",
+    "unlockTab": "탭 잠금 해제",
     "unsplit": "모든 창 병합"
   },
   "temporarySsh": {
