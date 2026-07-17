@@ -402,6 +402,46 @@ export const AI_PROVIDERS: Array<{ value: AIProviderKind; label: string }> = [
   { value: "openai_compatible", label: "OpenAI Compatible" },
 ];
 
+export type CustomAIProviderProtocol = Extract<
+  AIProviderKind,
+  "openai_compatible" | "anthropic" | "gemini"
+>;
+
+export const CUSTOM_AI_PROVIDER_PROTOCOLS: Array<{
+  value: CustomAIProviderProtocol;
+  labelKey: string;
+}> = [
+  { value: "openai_compatible", labelKey: "ai.apiProtocolOpenaiCompatible" },
+  { value: "anthropic", labelKey: "ai.apiProtocolAnthropic" },
+  { value: "gemini", labelKey: "ai.apiProtocolGemini" },
+];
+
+const CUSTOM_PROVIDER_BASE_URL_PLACEHOLDERS: Record<CustomAIProviderProtocol, string> = {
+  openai_compatible: "https://api.example.com/v1/",
+  anthropic: "https://api.anthropic.com/",
+  gemini: "https://generativelanguage.googleapis.com/",
+};
+
+export function getCustomProviderBaseUrlPlaceholder(providerKind: AIProviderKind): string {
+  return CUSTOM_PROVIDER_BASE_URL_PLACEHOLDERS[providerKind as CustomAIProviderProtocol] ?? "";
+}
+
+export function supportsCustomModelDiscovery(
+  credential: Pick<AIProviderCredential, "id" | "enabled" | "provider_kind">,
+): boolean {
+  return (
+    !isBuiltinProvider(credential.id) &&
+    credential.enabled &&
+    credential.provider_kind === "openai_compatible"
+  );
+}
+
+export function requiresManualCustomModelEntry(
+  credential: Pick<AIProviderCredential, "id" | "provider_kind">,
+): boolean {
+  return !isBuiltinProvider(credential.id) && credential.provider_kind !== "openai_compatible";
+}
+
 const DEFAULT_PROVIDER_PROFILES: AIProviderProfile[] = [
   {
     id: "openai",

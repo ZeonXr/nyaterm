@@ -12,9 +12,13 @@ import {
   aiModelIdForCredential,
   aiModelIdForProvider,
   BUILTIN_PROVIDERS,
+  CUSTOM_AI_PROVIDER_PROTOCOLS,
+  getCustomProviderBaseUrlPlaceholder,
   getProviderLabel,
   isBuiltinProvider,
   mergeModelDiscoveries,
+  requiresManualCustomModelEntry,
+  supportsCustomModelDiscovery,
 } from "@/lib/aiSettings";
 import { getErrorMessage } from "@/lib/errors";
 import { invoke } from "@/lib/invoke";
@@ -23,6 +27,7 @@ import type {
   AIModelConfigItem,
   AIModelDiscovery,
   AIProviderCredential,
+  AIProviderKind,
   AISettings,
 } from "@/types/global";
 import {
@@ -312,9 +317,7 @@ export function AiModelsTab() {
     update({ models, default_model_id: updateDefaultModelId(ai, models) });
   };
 
-  const hasCustomCredentials = ai.provider_credentials.some(
-    (c) => !isBuiltinProvider(c.id) && c.enabled,
-  );
+  const hasRefreshableCustomCredential = ai.provider_credentials.some(supportsCustomModelDiscovery);
 
   const refreshModels = async () => {
     setRefreshing(true);
@@ -483,7 +486,7 @@ export function AiModelsTab() {
           <Button
             size="icon-sm"
             variant="outline"
-            disabled={refreshing || !hasCustomCredentials}
+            disabled={refreshing || !hasRefreshableCustomCredential}
             onClick={() => void refreshModels()}
             title={t("ai.refreshModels")}
           >
@@ -550,6 +553,11 @@ export function AiModelsTab() {
                               {t("common.add")}
                             </Button>
                           </div>
+                          {requiresManualCustomModelEntry(group.credential) ? (
+                            <div className="mt-2 text-xs leading-5 text-muted-foreground">
+                              {t("ai.modelDiscoveryUnsupported")} {t("ai.manualModelRequired")}
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
                       {group.models.map((model) => (
@@ -646,9 +654,26 @@ export function AiModelsTab() {
                       updateCredential(credential.id, { name: event.target.value })
                     }
                   />
+                  <SettingSelect
+                    label={t("ai.apiProtocol")}
+                    value={credential.provider_kind}
+                    onValueChange={(provider_kind) =>
+                      updateCredential(credential.id, {
+                        provider_kind: provider_kind as AIProviderKind,
+                      })
+                    }
+                    triggerClassName="min-w-0 [&>span]:truncate"
+                  >
+                    {CUSTOM_AI_PROVIDER_PROTOCOLS.map((protocol) => (
+                      <SelectItem key={protocol.value} value={protocol.value}>
+                        {t(protocol.labelKey)}
+                      </SelectItem>
+                    ))}
+                  </SettingSelect>
                   <SettingInput
                     label={t("ai.baseUrl")}
-                    placeholder="https://api.openai.com/v1/"
+                    desc={t("ai.baseUrlRootHint")}
+                    placeholder={getCustomProviderBaseUrlPlaceholder(credential.provider_kind)}
                     value={credential.base_url ?? ""}
                     onChange={(event) =>
                       updateCredential(credential.id, { base_url: event.target.value })

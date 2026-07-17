@@ -308,12 +308,7 @@ fn genai_model_name(provider_kind: &AiProviderKind, model_name: &str) -> String 
 pub async fn list_model_names(app: &tauri::AppHandle) -> AppResult<Vec<AiModelDiscovery>> {
     let settings = config::load_app_settings(app)?;
 
-    let custom_credentials: Vec<_> = settings
-        .ai
-        .provider_credentials
-        .iter()
-        .filter(|c| c.enabled && c.provider_kind == AiProviderKind::OpenaiCompatible)
-        .collect();
+    let custom_credentials = openai_compatible_model_discovery_credentials(&settings.ai);
 
     let mut models = BTreeMap::new();
     let mut errors = Vec::new();
@@ -375,6 +370,36 @@ pub async fn list_model_names(app: &tauri::AppHandle) -> AppResult<Vec<AiModelDi
     Ok(models.into_values().collect())
 }
 
+fn openai_compatible_model_discovery_credentials(
+    settings: &AiSettings,
+) -> Vec<&AiProviderCredential> {
+    settings
+        .provider_credentials
+        .iter()
+        .filter(|credential| {
+            credential.enabled
+                && credential.provider_kind == AiProviderKind::OpenaiCompatible
+                && !is_builtin_ai_provider_credential_id(&credential.id)
+        })
+        .collect()
+}
+
+fn is_builtin_ai_provider_credential_id(id: &str) -> bool {
+    matches!(
+        id,
+        "openai"
+            | "anthropic"
+            | "gemini"
+            | "deepseek"
+            | "groq"
+            | "ollama"
+            | "xai"
+            | "cohere"
+            | "mimo"
+            | "zai"
+    )
+}
+
 /// Fetches model names from an OpenAI-compatible `/v1/models` endpoint directly via HTTP,
 /// bypassing `genai::Client::all_model_names` which does not apply the `ServiceTargetResolver`
 /// (and therefore ignores custom auth/endpoint configuration).
@@ -426,6 +451,7 @@ fn openai_compatible_models_url(base_url: &str) -> AppResult<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::ai::types::{AiAction, AiContext, AiRequestOptions};
     use genai::resolver::{AuthData, Endpoint};
 
     fn test_service_target(auth: AuthData) -> genai::ServiceTarget {
@@ -437,13 +463,37 @@ mod tests {
     }
 
     fn test_credential(kind: AiProviderKind, api_key: Option<&str>) -> AiProviderCredential {
+        test_credential_with_id("credential-test", kind, api_key)
+    }
+
+    fn test_credential_with_id(
+        id: &str,
+        kind: AiProviderKind,
+        api_key: Option<&str>,
+    ) -> AiProviderCredential {
         AiProviderCredential {
-            id: "credential-test".to_string(),
+            id: id.to_string(),
             name: "Test Provider".to_string(),
             provider_kind: kind,
             base_url: Some("http://localhost:11434/v1/".to_string()),
             api_key: api_key.map(str::to_string),
             enabled: true,
+        }
+    }
+
+    fn test_request(model_id: &str) -> AiChatRequest {
+        AiChatRequest {
+            stream_id: None,
+            session_id: None,
+            connection_id: None,
+            terminal_session_id: None,
+            mode: crate::config::AiMode::Ask,
+            model_id: Some(model_id.to_string()),
+            model_name: None,
+            action: AiAction::GenerateCommand,
+            user_input: "test".to_string(),
+            context: AiContext::default(),
+            options: AiRequestOptions::default(),
         }
     }
 
@@ -540,6 +590,48 @@ mod tests {
     }
 
     #[test]
+    fn custom_base_url_overrides_default_endpoint() {
+        let target = apply_service_target_overrides(
+            test_service_target(AuthData::from_env("ANTHROPIC_API_KEY")),
+            Some("configured-key".to_string()),
+            Some("https://anthropic-proxy.example.com/".to_string()),
+            false,
+        );
+
+        assert!(format!("{:?}", target.endpoint).contains("https://anthropic-proxy.example.com/"));
+    }
+
+    #[test]
+    fn custom_anthropic_and_gemini_use_native_adapters() {
+        assert_eq!(
+            adapter_kind(&AiProviderKind::Anthropic),
+            AdapterKind::Anthropic
+        );
+        assert_eq!(adapter_kind(&AiProviderKind::Gemini), AdapterKind::Gemini);
+    }
+
+    #[test]
+    fn anthropic_and_gemini_empty_keys_fail_validation() {
+        for kind in [AiProviderKind::Anthropic, AiProviderKind::Gemini] {
+            let credential = test_credential(kind.clone(), None);
+            let error = validate_model_credential(&kind, Some(&credential)).unwrap_err();
+
+            assert!(
+                error
+                    .to_string()
+                    .contains("No API key configured for AI credential")
+            );
+        }
+    }
+
+    #[test]
+    fn openai_compatible_empty_key_still_passes_validation() {
+        let credential = test_credential(AiProviderKind::OpenaiCompatible, None);
+
+        validate_model_credential(&AiProviderKind::OpenaiCompatible, Some(&credential)).unwrap();
+    }
+
+    #[test]
     fn openai_empty_key_still_fails_validation() {
         let credential = test_credential(AiProviderKind::Openai, None);
         let error =
@@ -550,6 +642,63 @@ mod tests {
                 .to_string()
                 .contains("No API key configured for AI credential")
         );
+    }
+
+    #[test]
+    fn model_discovery_credentials_only_include_custom_openai_compatible() {
+        let mut settings = AiSettings::default();
+        settings.provider_credentials = vec![
+            test_credential_with_id("openai", AiProviderKind::OpenaiCompatible, None),
+            test_credential_with_id("credential-openai", AiProviderKind::OpenaiCompatible, None),
+            test_credential_with_id(
+                "credential-anthropic",
+                AiProviderKind::Anthropic,
+                Some("key"),
+            ),
+            test_credential_with_id("credential-gemini", AiProviderKind::Gemini, Some("key")),
+            AiProviderCredential {
+                enabled: false,
+                ..test_credential_with_id(
+                    "credential-disabled",
+                    AiProviderKind::OpenaiCompatible,
+                    None,
+                )
+            },
+        ];
+
+        let ids: Vec<_> = openai_compatible_model_discovery_credentials(&settings)
+            .into_iter()
+            .map(|credential| credential.id.as_str())
+            .collect();
+
+        assert_eq!(ids, vec!["credential-openai"]);
+    }
+
+    #[test]
+    fn model_resolution_prefers_explicit_credential_id_for_same_protocol_credentials() {
+        let mut settings = AiSettings::default();
+        settings.provider_credentials = vec![
+            test_credential_with_id("credential-a", AiProviderKind::Anthropic, Some("key-a")),
+            test_credential_with_id("credential-b", AiProviderKind::Anthropic, Some("key-b")),
+        ];
+        settings.models = vec![AiModelConfigItem {
+            id: "credential-b:claude-test".to_string(),
+            name: "claude-test".to_string(),
+            provider_kind: Some(AiProviderKind::Anthropic),
+            credential_id: Some("credential-b".to_string()),
+            enabled: true,
+            source: AiModelSource::Manual,
+            last_seen_at: None,
+        }];
+        settings.default_model_id = Some("credential-b:claude-test".to_string());
+
+        let resolved =
+            resolve_request_model(&settings, &test_request("credential-b:claude-test")).unwrap();
+
+        let credential = resolved.credential.expect("credential should resolve");
+        assert_eq!(credential.id, "credential-b");
+        assert_eq!(credential.api_key.as_deref(), Some("key-b"));
+        assert_eq!(resolved.provider_kind, AiProviderKind::Anthropic);
     }
 
     #[test]
