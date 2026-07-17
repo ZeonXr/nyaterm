@@ -160,7 +160,7 @@ fn pty_session_thread(
 
     #[cfg(target_os = "macos")]
     ensure_macos_interactive_path(&mut cmd);
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     configure_local_pty_environment(&mut cmd);
 
     let mut _child = match pair.slave.spawn_command(cmd) {
