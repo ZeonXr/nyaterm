@@ -83,15 +83,25 @@ struct TargetedTrayActionPayload {
 enum TrayLanguage {
     En,
     ZhCn,
+    ZhTw,
 }
 
 impl TrayLanguage {
     fn from_settings(settings: &AppSettings) -> Self {
         let language = settings.ui.language.as_deref().unwrap_or("en");
-        if language.eq_ignore_ascii_case("zh-CN")
-            || language.eq_ignore_ascii_case("zh_CN")
-            || language.eq_ignore_ascii_case("zh")
-            || language.to_ascii_lowercase().starts_with("zh-")
+        let normalized = language.replace('_', "-").to_ascii_lowercase();
+        if normalized == "zh-tw"
+            || normalized == "zh-hant"
+            || normalized.starts_with("zh-hant-")
+            || normalized == "zh-hk"
+            || normalized == "zh-mo"
+        {
+            Self::ZhTw
+        } else if normalized == "zh-cn"
+            || normalized == "zh"
+            || normalized == "zh-hans"
+            || normalized.starts_with("zh-hans-")
+            || normalized.starts_with("zh-")
         {
             Self::ZhCn
         } else {
@@ -162,6 +172,35 @@ impl TrayStrings {
                 session_type_telnet: "Telnet",
                 session_type_serial: "串口",
             },
+            TrayLanguage::ZhTw => Self {
+                show_main_window: "顯示主視窗",
+                hide_to_tray: "隱藏到系統匣",
+                new_session: "新增連線…",
+                active_sessions: "使用中的工作階段",
+                no_active_sessions: "目前沒有使用中的工作階段",
+                only_showing_first_8: "僅顯示前 8 個",
+                open_active_sessions_panel: "開啟使用中工作階段面板",
+                cloud_sync: "雲端同步",
+                current_status: "目前狀態",
+                sync_push_now: "立即推送",
+                sync_pull_now: "立即拉取",
+                open_cloud_sync_history: "開啟雲端同步歷程",
+                settings: "設定…",
+                minimize_to_tray: "關閉時最小化到系統匣",
+                lock_screen: "鎖定介面",
+                check_updates: "檢查更新",
+                quit: "結束 NyaTerm",
+                status_idle: "閒置",
+                status_running: "執行中",
+                status_success: "成功",
+                status_failed: "失敗",
+                status_conflict: "衝突",
+                status_disabled: "已停用",
+                session_type_ssh: "SSH",
+                session_type_local: "本機終端",
+                session_type_telnet: "Telnet",
+                session_type_serial: "序列埠",
+            },
             TrayLanguage::En => Self {
                 show_main_window: "Show Main Window",
                 hide_to_tray: "Hide to Tray",
@@ -196,14 +235,18 @@ impl TrayStrings {
 
     fn active_sessions_title(&self, language: TrayLanguage, count: usize) -> String {
         match language {
-            TrayLanguage::ZhCn => format!("{} ({count})", self.active_sessions),
+            TrayLanguage::ZhCn | TrayLanguage::ZhTw => {
+                format!("{} ({count})", self.active_sessions)
+            }
             TrayLanguage::En => format!("{} ({count})", self.active_sessions),
         }
     }
 
     fn cloud_sync_title(&self, language: TrayLanguage, status: &str) -> String {
         match language {
-            TrayLanguage::ZhCn => format!("{}（{status}）", self.cloud_sync),
+            TrayLanguage::ZhCn | TrayLanguage::ZhTw => {
+                format!("{}（{status}）", self.cloud_sync)
+            }
             TrayLanguage::En => format!("{} ({status})", self.cloud_sync),
         }
     }
