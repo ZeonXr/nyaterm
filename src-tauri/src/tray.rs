@@ -239,9 +239,8 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
     let menu = Menu::new(app)?;
     app.manage(TrayMenuState::new(menu.clone()));
 
-    TrayIconBuilder::with_id(TRAY_ID)
+    let mut tray_builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
-        .icon(app.default_window_icon().unwrap().clone())
         .tooltip("NyaTerm")
         .show_menu_on_left_click(false)
         .on_menu_event(handle_menu_event)
@@ -254,8 +253,21 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
                 app::show_main_window(tray.app_handle());
             }
             _ => {}
-        })
-        .build(app)?;
+        });
+
+    #[cfg(target_os = "macos")]
+    {
+        tray_builder = tray_builder
+            .icon(tauri::include_image!("./icons/tray-macos.png"))
+            .icon_as_template(true);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        tray_builder = tray_builder.icon(app.default_window_icon().unwrap().clone());
+    }
+
+    tray_builder.build(app)?;
 
     schedule_refresh(app.handle());
     Ok(())
