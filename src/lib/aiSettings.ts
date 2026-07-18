@@ -17,7 +17,9 @@ export interface BuiltinProviderInfo {
 export const DEFAULT_AI_REQUEST_USER_AGENT =
   "codex-tui/0.125.0 (Ubuntu 22.4.0; x86_64) xterm-256color (codex-tui; 0.125.0)";
 
-export const BUILTIN_PROVIDERS: Partial<Record<AIProviderKind, BuiltinProviderInfo>> = {
+export const BUILTIN_PROVIDERS: Partial<
+  Record<AIProviderKind, BuiltinProviderInfo>
+> = {
   openai: {
     label: "OpenAI",
     defaultBaseUrl: null,
@@ -380,7 +382,9 @@ export function isBuiltinProvider(id: string): boolean {
   return BUILTIN_PROVIDER_KINDS.has(id as AIProviderKind);
 }
 
-export function getProviderLabel(providerKind: AIProviderKind | string | null | undefined): string {
+export function getProviderLabel(
+  providerKind: AIProviderKind | string | null | undefined,
+): string {
   if (!providerKind) return "";
   const builtin = BUILTIN_PROVIDERS[providerKind as AIProviderKind];
   if (builtin) return builtin.label;
@@ -416,14 +420,23 @@ export const CUSTOM_AI_PROVIDER_PROTOCOLS: Array<{
   { value: "gemini", labelKey: "ai.apiProtocolGemini" },
 ];
 
-const CUSTOM_PROVIDER_BASE_URL_PLACEHOLDERS: Record<CustomAIProviderProtocol, string> = {
+const CUSTOM_PROVIDER_BASE_URL_PLACEHOLDERS: Record<
+  CustomAIProviderProtocol,
+  string
+> = {
   openai_compatible: "https://api.example.com/v1/",
   anthropic: "https://api.anthropic.com/",
   gemini: "https://generativelanguage.googleapis.com/",
 };
 
-export function getCustomProviderBaseUrlPlaceholder(providerKind: AIProviderKind): string {
-  return CUSTOM_PROVIDER_BASE_URL_PLACEHOLDERS[providerKind as CustomAIProviderProtocol] ?? "";
+export function getCustomProviderBaseUrlPlaceholder(
+  providerKind: AIProviderKind,
+): string {
+  return (
+    CUSTOM_PROVIDER_BASE_URL_PLACEHOLDERS[
+      providerKind as CustomAIProviderProtocol
+    ] ?? ""
+  );
 }
 
 export function supportsCustomModelDiscovery(
@@ -439,7 +452,10 @@ export function supportsCustomModelDiscovery(
 export function requiresManualCustomModelEntry(
   credential: Pick<AIProviderCredential, "id" | "provider_kind">,
 ): boolean {
-  return !isBuiltinProvider(credential.id) && credential.provider_kind !== "openai_compatible";
+  return (
+    !isBuiltinProvider(credential.id) &&
+    credential.provider_kind !== "openai_compatible"
+  );
 }
 
 const DEFAULT_PROVIDER_PROFILES: AIProviderProfile[] = [
@@ -557,17 +573,24 @@ export const DEFAULT_FILE_AI_ACTIONS: AICustomActionConfig[] = [
 ];
 
 export function getModelProviderLabel(
-  model: { provider_kind?: AIProviderKind | null; credential_id?: string | null },
+  model: {
+    provider_kind?: AIProviderKind | null;
+    credential_id?: string | null;
+  },
   credentials: AIProviderCredential[],
 ): string {
   if (model.credential_id) {
     const cred = credentials.find((c) => c.id === model.credential_id);
-    if (cred && !isBuiltinProvider(cred.id)) return cred.name || "Custom Provider";
+    if (cred && !isBuiltinProvider(cred.id))
+      return cred.name || "Custom Provider";
   }
   return getProviderLabel(model.provider_kind);
 }
 
-export function aiModelIdForProvider(providerKind: AIProviderKind, name: string) {
+export function aiModelIdForProvider(
+  providerKind: AIProviderKind,
+  name: string,
+) {
   return `${providerKind}:${name}`;
 }
 
@@ -575,7 +598,9 @@ export function aiModelIdForCredential(credentialId: string, name: string) {
   return `${credentialId}:${name}`;
 }
 
-function credentialFromProfile(profile: AIProviderProfile): AIProviderCredential {
+function credentialFromProfile(
+  profile: AIProviderProfile,
+): AIProviderCredential {
   return {
     id: profile.id,
     name: profile.name,
@@ -623,8 +648,26 @@ function normalizeAILocale(value?: string | null): string | null {
   const normalized = normalizeLocaleTag(value);
   if (!normalized) return null;
   const lower = normalized.toLowerCase();
-  if (lower === "en" || lower.startsWith("en-")) return "en";
-  if (lower === "zh" || lower.startsWith("zh-")) return "zh-CN";
+  const hyphenated = lower.replace(/_/g, "-");
+  if (hyphenated === "en" || hyphenated.startsWith("en-")) return "en";
+  if (
+    hyphenated === "zh-tw" ||
+    hyphenated === "zh-hant" ||
+    hyphenated.startsWith("zh-hant-") ||
+    hyphenated === "zh-hk" ||
+    hyphenated === "zh-mo"
+  ) {
+    return "zh-TW";
+  }
+  if (
+    hyphenated === "zh" ||
+    hyphenated === "zh-cn" ||
+    hyphenated === "zh-sg" ||
+    hyphenated === "zh-hans" ||
+    hyphenated.startsWith("zh-hans-")
+  ) {
+    return "zh-CN";
+  }
   return normalized;
 }
 
