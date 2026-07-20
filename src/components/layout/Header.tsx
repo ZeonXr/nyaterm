@@ -317,6 +317,7 @@ export default function Header({
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
     updateUi({ language: lng });
+    void invoke("save_app_language", { language: lng }).catch(() => {});
   };
 
   const handleZoom = (delta: number) => {

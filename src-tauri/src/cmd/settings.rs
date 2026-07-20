@@ -82,6 +82,25 @@ pub async fn save_app_settings(
 }
 
 #[tauri::command]
+pub fn save_app_language(app: tauri::AppHandle, language: String) -> AppResult<()> {
+    use crate::storage::{self, SettingsDocKey};
+
+    storage::update_settings_doc(
+        SettingsDocKey::AppSettings,
+        |settings: &mut config::AppSettings| {
+            settings.ui.language = Some(language);
+            Ok(())
+        },
+    )?;
+
+    schedule_cloud_sync_notify(app.clone());
+    let _ = app.emit("settings-changed", ());
+    crate::tray::schedule_refresh(&app);
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn import_keyword_highlight_rules(
     app: tauri::AppHandle,
     manager: tauri::State<'_, Arc<CloudSyncManager>>,

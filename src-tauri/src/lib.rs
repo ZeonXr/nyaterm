@@ -235,6 +235,7 @@ pub fn run() {
             cmd::credential::reorder_credentials,
             cmd::settings::get_app_settings,
             cmd::settings::save_app_settings,
+            cmd::settings::save_app_language,
             cmd::settings::import_keyword_highlight_rules,
             cmd::settings::read_theme_file,
             cmd::settings::write_theme_file,
