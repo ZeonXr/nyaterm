@@ -14,13 +14,14 @@ use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::{Mutex, RwLock, oneshot};
 use tokio::time::timeout;
 
-use crate::config::{AiBackendKind, AiMode, AiModelSource, AiSettings, CodexThreadMode};
+use crate::config::{AiAgentKind, AiBackendKind, AiModelSource, AiSettings, CodexThreadMode};
 use crate::core::SessionManager;
 use crate::error::{AppError, AppResult};
 
 use super::agent::{AgentApprovalManager, run_external_agent_command_step};
 use super::history::{
-    append_message, get_session_backend_metadata, save_user_message, set_session_backend_metadata,
+    append_message, get_session_backend_metadata, get_session_external_session_id,
+    save_user_message, set_session_backend_metadata, set_session_external_session_id,
 };
 use super::model::resolve_request_model_config;
 use super::prompt::build_prompt;
@@ -805,9 +806,14 @@ async fn run_codex_stream_inner(
         save_user_message(&app, &session_id, request)?;
     }
 
-    let thread_id = get_session_backend_metadata(&app, &session_id)?
-        .filter(|metadata| metadata.backend == AiBackendKind::Codex)
-        .and_then(|metadata| metadata.external_thread_id);
+    let thread_id = get_session_external_session_id(&app, &session_id, AiAgentKind::Codex)?
+        .or_else(|| {
+            get_session_backend_metadata(&app, &session_id)
+                .ok()
+                .flatten()
+                .filter(|metadata| metadata.backend == AiBackendKind::Codex)
+                .and_then(|metadata| metadata.external_thread_id)
+        });
 
     let thread_id = if let Some(thread_id) = thread_id {
         manager
@@ -829,11 +835,7 @@ async fn run_codex_stream_inner(
             },
             "approvalsReviewer": "user",
             "sandbox": "read-only",
-            "dynamicTools": if request.mode == AiMode::Agent && settings.codex.remote_terminal_agent_enabled {
-                json!([terminal_tool_namespace()])
-            } else {
-                Value::Null
-            }
+            "dynamicTools": Value::Null
         });
         let response = manager.request("thread/start", params).await?;
         let new_thread_id = response
@@ -852,6 +854,12 @@ async fn run_codex_stream_inner(
                 backend: AiBackendKind::Codex,
                 external_thread_id: Some(new_thread_id.clone()),
             },
+        )?;
+        set_session_external_session_id(
+            &app,
+            &session_id,
+            AiAgentKind::Codex,
+            new_thread_id.clone(),
         )?;
         new_thread_id
     };
@@ -1129,6 +1137,7 @@ fn parse_account_status(value: &Value) -> CodexAccountStatus {
     }
 }
 
+#[allow(dead_code)]
 fn terminal_tool_namespace() -> Value {
     json!({
         "type": "namespace",
