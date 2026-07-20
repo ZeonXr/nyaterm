@@ -8,11 +8,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  type FileExplorerBackendKind,
+  formatExplorerPathFromHome,
+  normalizeExplorerPath,
+} from "./model";
 
 interface FileExplorerPathBarProps {
   isEditingPath: boolean;
   pathInputText: string;
   pathInputRef: RefObject<HTMLInputElement | null>;
+  backend: FileExplorerBackendKind;
   displayPath: string;
   currentPath: string;
   homeDir: string;
@@ -35,6 +41,7 @@ export function FileExplorerPathBar({
   isEditingPath,
   pathInputText,
   pathInputRef,
+  backend,
   displayPath,
   currentPath,
   homeDir,
@@ -69,13 +76,11 @@ export function FileExplorerPathBar({
 
   const formatHistoryPath = (path: string) => {
     if (!homeDir) return path;
-    if (path === homeDir) return "~";
-    if (path.startsWith(`${homeDir}/`)) return `~${path.slice(homeDir.length)}`;
-    return path;
+    return formatExplorerPathFromHome(path, homeDir, backend);
   };
 
   const showHistory = isEditingPath && directoryHistory.length > 0;
-  const normalizedCurrentPath = currentPath || homeDir;
+  const normalizedCurrentPath = normalizeExplorerPath(currentPath || homeDir, backend);
   const hasFavoriteDirectories = favoriteDirectories.length > 0;
   const isCurrentFavorite = favoriteDirectories.includes(normalizedCurrentPath);
   const FavoriteIcon = isCurrentFavorite ? MdBookmarkAdded : MdBookmarkBorder;
@@ -102,7 +107,7 @@ export function FileExplorerPathBar({
             if (event.key === "Enter") {
               let path = pathInputText.trim();
               if (path) {
-                if (path.startsWith("~/") && homeDir) {
+                if ((path.startsWith("~/") || path.startsWith("~\\")) && homeDir) {
                   path = homeDir + path.substring(1);
                 } else if (path === "~" && homeDir) {
                   path = homeDir;

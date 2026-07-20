@@ -268,35 +268,49 @@ export function AiAgentsTab() {
     [ai, codex, updateAppSettings],
   );
 
-  const detect = useCallback(async () => {
-    setBusy(true);
-    try {
-      const status = await invoke<CodexCliStatus>("detect_codex_cli");
-      setCliStatus(status);
-      if (status.installed && status.path && !codex.executable_path) {
-        update({ executable_path: status.path });
+  const detect = useCallback(
+    async (options?: { silent?: boolean }) => {
+      setBusy(true);
+      try {
+        const status = await invoke<CodexCliStatus>("detect_codex_cli");
+        setCliStatus(status);
+        if (status.installed && status.path && !codex.executable_path) {
+          update({ executable_path: status.path });
+        }
+        if (!options?.silent) {
+          if (status.installed) toast.success(t("ai.codexDetected"));
+          else toast.error(status.error || t("ai.codexNotInstalled"));
+        }
+      } catch (error) {
+        if (!options?.silent) {
+          toast.error(getErrorMessage(error));
+        }
+      } finally {
+        setBusy(false);
       }
-      if (status.installed) toast.success(t("ai.codexDetected"));
-      else toast.error(status.error || t("ai.codexNotInstalled"));
-    } catch (error) {
-      toast.error(getErrorMessage(error));
-    } finally {
-      setBusy(false);
-    }
-  }, [codex.executable_path, t, update]);
+    },
+    [codex.executable_path, t, update],
+  );
 
-  const refreshAccount = useCallback(async () => {
-    setBusy(true);
-    try {
-      const status = await invoke<CodexAccountStatus>("get_codex_account_status");
-      setAccountStatus(status);
-      toast.success(t("ai.codexStatusRefreshed"));
-    } catch (error) {
-      toast.error(getErrorMessage(error));
-    } finally {
-      setBusy(false);
-    }
-  }, [t]);
+  const refreshAccount = useCallback(
+    async (options?: { silent?: boolean }) => {
+      setBusy(true);
+      try {
+        const status = await invoke<CodexAccountStatus>("get_codex_account_status");
+        setAccountStatus(status);
+        if (!options?.silent) {
+          toast.success(t("ai.codexStatusRefreshed"));
+        }
+      } catch (error) {
+        if (!options?.silent) {
+          toast.error(getErrorMessage(error));
+        }
+      } finally {
+        setBusy(false);
+      }
+    },
+    [t],
+  );
 
   const startLogin = useCallback(
     async (flow: "browser" | "deviceCode") => {
@@ -334,8 +348,8 @@ export function AiAgentsTab() {
   useEffect(() => {
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
-    void detect();
-    if (codex.enabled) void refreshAccount();
+    void detect({ silent: true });
+    if (codex.enabled) void refreshAccount({ silent: true });
   }, [codex.enabled, detect, refreshAccount]);
 
   const connectedLabel = accountStatus?.connected

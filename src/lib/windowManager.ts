@@ -421,7 +421,9 @@ export function openAutoUpload(data: { sessionId: string; localPath: string; rem
 
 export interface RemoteFileEditorWindowData {
   sessionId: string;
-  remotePath: string;
+  backend?: "remote" | "local";
+  path?: string;
+  remotePath?: string;
   name: string;
   size: number;
   mtime: number;

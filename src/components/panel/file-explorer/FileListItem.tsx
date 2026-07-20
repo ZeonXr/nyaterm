@@ -52,6 +52,7 @@ interface FileListItemProps {
   onOpenInternal: (entry: FileEntry) => void;
   onOpenExternal: (entry: FileEntry) => void;
   onRefresh: () => void;
+  showTransferActions: boolean;
   onUpload: () => void;
   onUploadFolder: () => void;
   onDownload: (entry: FileEntry) => void;
@@ -102,6 +103,7 @@ export function FileListItem({
   onOpenInternal,
   onOpenExternal,
   onRefresh,
+  showTransferActions,
   onUpload,
   onUploadFolder,
   onDownload,
@@ -386,27 +388,31 @@ export function FileListItem({
               <MdRefresh className="text-[0.875rem] text-muted-foreground mr-2" />
               {t("fileExplorer.cmRefresh")}
             </ContextMenuItem>
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>
-                <MdUpload className="text-[0.875rem] text-muted-foreground mr-2" />
-                {t("fileExplorer.cmUpload")}
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-48">
-                <ContextMenuItem onClick={onUpload}>
-                  <MdUpload className="text-[0.875rem] text-muted-foreground mr-2" />
-                  {t("fileExplorer.upload")}
+            {showTransferActions && (
+              <>
+                <ContextMenuSub>
+                  <ContextMenuSubTrigger>
+                    <MdUpload className="text-[0.875rem] text-muted-foreground mr-2" />
+                    {t("fileExplorer.cmUpload")}
+                  </ContextMenuSubTrigger>
+                  <ContextMenuSubContent className="w-48">
+                    <ContextMenuItem onClick={onUpload}>
+                      <MdUpload className="text-[0.875rem] text-muted-foreground mr-2" />
+                      {t("fileExplorer.upload")}
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={onUploadFolder}>
+                      <MdDriveFolderUpload className="text-[0.875rem] text-muted-foreground mr-2" />
+                      {t("fileExplorer.uploadFolder")}
+                    </ContextMenuItem>
+                  </ContextMenuSubContent>
+                </ContextMenuSub>
+                <ContextMenuItem onClick={() => onDownload(entry)}>
+                  <MdDownload className="text-[0.875rem] text-muted-foreground mr-2" />
+                  {t("fileExplorer.cmDownload")}
                 </ContextMenuItem>
-                <ContextMenuItem onClick={onUploadFolder}>
-                  <MdDriveFolderUpload className="text-[0.875rem] text-muted-foreground mr-2" />
-                  {t("fileExplorer.uploadFolder")}
-                </ContextMenuItem>
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-            <ContextMenuItem onClick={() => onDownload(entry)}>
-              <MdDownload className="text-[0.875rem] text-muted-foreground mr-2" />
-              {t("fileExplorer.cmDownload")}
-            </ContextMenuItem>
-            <ContextMenuSeparator />
+                <ContextMenuSeparator />
+              </>
+            )}
             <ContextMenuItem
               onClick={() => {
                 preventNextContextMenuAutoFocusRef.current = true;

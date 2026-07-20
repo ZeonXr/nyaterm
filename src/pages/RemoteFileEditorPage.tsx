@@ -82,7 +82,11 @@ import ReloadDirtyDialog from "@/components/dialog/remote-file-editor/ReloadDirt
 import RemoteFileConflictDialog from "@/components/dialog/remote-file-editor/RemoteFileConflictDialog";
 import UnsavedChangesDialog from "@/components/dialog/remote-file-editor/UnsavedChangesDialog";
 import ChildWindowHeader from "@/components/layout/ChildWindowHeader";
-import { languageFromFilename, type RemoteTextFile } from "@/components/panel/file-explorer/model";
+import {
+  getLocalPathName,
+  languageFromFilename,
+  type RemoteTextFile,
+} from "@/components/panel/file-explorer/model";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -174,9 +178,13 @@ const editorHighlightStyle = HighlightStyle.define([
   },
 ]);
 
+type FileEditorBackendKind = "remote" | "local";
+
 interface RemoteFileEditorData {
   sessionId: string;
-  remotePath: string;
+  backend?: FileEditorBackendKind;
+  path?: string;
+  remotePath?: string;
   name: string;
   size: number;
   mtime: number;
@@ -187,8 +195,15 @@ interface RemoteFileEditorOpenPayload {
   data: RemoteFileEditorData;
 }
 
-interface EditorTab extends RemoteFileEditorData {
+interface EditorTab {
   id: string;
+  sessionId: string;
+  backend: FileEditorBackendKind;
+  path: string;
+  remotePath: string;
+  name: string;
+  size: number;
+  mtime: number;
   content: string;
   baseSize: number;
   baseMtime: number;
@@ -301,20 +316,26 @@ function languageExtension(language: string) {
   }
 }
 
-function tabId(data: Pick<RemoteFileEditorData, "sessionId" | "remotePath">) {
-  return `${data.sessionId}\n${data.remotePath}`;
+function getEditorDataPath(data: Pick<RemoteFileEditorData, "path" | "remotePath">) {
+  return data.path ?? data.remotePath ?? "";
+}
+
+function tabId(data: Pick<RemoteFileEditorData, "backend" | "sessionId" | "path" | "remotePath">) {
+  const backend = data.backend ?? "remote";
+  return `${backend}\n${data.sessionId}\n${getEditorDataPath(data)}`;
 }
 
 function getParentDirectoryName(path: string) {
-  const normalized = path.replace(/\/+$/, "");
-  if (!normalized || normalized === "/") return "/";
-  const parent = normalized.slice(0, normalized.lastIndexOf("/"));
-  if (!parent || parent === "/") return "/";
-  return parent.slice(parent.lastIndexOf("/") + 1) || "/";
+  const normalized = path.replace(/[\\/]+$/, "");
+  if (!normalized || normalized === "/" || /^[a-zA-Z]:$/.test(normalized)) return normalized || "/";
+  const index = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
+  const parent = index > 0 ? normalized.slice(0, index) : "";
+  if (!parent || parent === "/" || /^[a-zA-Z]:$/.test(parent)) return parent || "/";
+  return getLocalPathName(parent, parent);
 }
 
 function getTabBaseLabel(tab: EditorTab) {
-  return tab.name || tab.remotePath.split("/").pop() || tab.remotePath;
+  return tab.name || getLocalPathName(tab.path, tab.path);
 }
 
 function getDisplayLanguage(language: string) {
@@ -337,8 +358,15 @@ function formatRemoteMtime(mtime?: number) {
 }
 
 function createTab(data: RemoteFileEditorData): EditorTab {
+  const path = getEditorDataPath(data);
   return {
-    ...data,
+    sessionId: data.sessionId,
+    backend: data.backend ?? "remote",
+    path,
+    remotePath: path,
+    name: data.name,
+    size: data.size,
+    mtime: data.mtime,
     id: tabId(data),
     content: "",
     baseSize: data.size,
@@ -348,7 +376,7 @@ function createTab(data: RemoteFileEditorData): EditorTab {
     dirty: false,
     error: "",
     lastSavedAt: null,
-    language: languageFromFilename(data.name || data.remotePath),
+    language: languageFromFilename(data.name || path),
   };
 }
 
@@ -573,11 +601,14 @@ export default function RemoteFileEditorPage() {
 
       updateTab(id, (current) => ({ ...current, loading: true, error: "" }));
       try {
-        const result = await invoke<RemoteTextFile>("read_remote_file_text", {
-          sessionId: tab.sessionId,
-          path: tab.remotePath,
-          maxBytes: MAX_EDITOR_FILE_BYTES,
-        });
+        const result = await invoke<RemoteTextFile>(
+          tab.backend === "local" ? "read_local_file_text" : "read_remote_file_text",
+          {
+            sessionId: tab.sessionId,
+            path: tab.path,
+            maxBytes: MAX_EDITOR_FILE_BYTES,
+          },
+        );
         updateTab(id, (current) => ({
           ...current,
           content: result.content,
@@ -735,14 +766,17 @@ export default function RemoteFileEditorPage() {
       if (!tab || tab.saving) return false;
       updateTab(id, (current) => ({ ...current, saving: true, error: "" }));
       try {
-        const result = await invoke<WriteRemoteFileTextResult>("write_remote_file_text", {
-          sessionId: tab.sessionId,
-          path: tab.remotePath,
-          content: tab.content,
-          expectedMtime: tab.baseMtime,
-          expectedSize: tab.baseSize,
-          force,
-        });
+        const result = await invoke<WriteRemoteFileTextResult>(
+          tab.backend === "local" ? "write_local_file_text" : "write_remote_file_text",
+          {
+            sessionId: tab.sessionId,
+            path: tab.path,
+            content: tab.content,
+            expectedMtime: tab.baseMtime,
+            expectedSize: tab.baseSize,
+            force,
+          },
+        );
         if (result.status === "conflict") {
           setConflictTabId(id);
           return false;
@@ -785,6 +819,11 @@ export default function RemoteFileEditorPage() {
   const openExternal = useCallback(
     (tab: EditorTab) => {
       const run = async () => {
+        if (tab.backend === "local") {
+          await openPath(tab.path, appSettings.transfer.default_editor || undefined);
+          return;
+        }
+
         const root = await tempDir();
         const safeName = await invoke<string>("sanitize_download_file_name", { name: tab.name });
         const localPath = await join(
@@ -796,13 +835,13 @@ export default function RemoteFileEditorPage() {
         );
         await invoke("download_remote_file", {
           sessionId: tab.sessionId,
-          remotePath: tab.remotePath,
+          remotePath: tab.path,
           localPath,
         });
         await invoke("start_file_watch", {
           sessionId: tab.sessionId,
           localPath,
-          remotePath: tab.remotePath,
+          remotePath: tab.path,
         });
         await openPath(localPath, appSettings.transfer.default_editor || undefined);
       };

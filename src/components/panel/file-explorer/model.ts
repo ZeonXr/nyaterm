@@ -27,6 +27,8 @@ export type LoadDirectoryOptions = {
   rawPathToken?: string;
 };
 
+export type FileExplorerBackendKind = "remote" | "local";
+
 export type InlineRenameState = {
   entryName: string;
   oldPath: string;
@@ -412,11 +414,115 @@ export function normalizeDirectoryPath(path: string) {
   return normalized || "/";
 }
 
+function isWindowsDriveRoot(path: string) {
+  return /^[a-zA-Z]:[\\/]?$/.test(path);
+}
+
+function normalizeWindowsDriveRoot(path: string) {
+  return isWindowsDriveRoot(path) ? `${path.slice(0, 2)}\\` : path;
+}
+
+function isUncRoot(path: string) {
+  const normalized = path.replace(/\//g, "\\");
+  if (!normalized.startsWith("\\\\")) return false;
+  const parts = normalized.split("\\").filter(Boolean);
+  return parts.length <= 2;
+}
+
+function getLocalSeparator(path: string) {
+  return path.includes("\\") || isWindowsDriveRoot(path) || path.startsWith("\\\\") ? "\\" : "/";
+}
+
+export function normalizeExplorerPath(path: string, backend: FileExplorerBackendKind) {
+  if (backend === "remote") return normalizeDirectoryPath(path);
+  const trimmed = path.trim();
+  if (!trimmed) return "";
+  if (trimmed === "/" || trimmed === "\\") return trimmed;
+  if (isWindowsDriveRoot(trimmed)) return normalizeWindowsDriveRoot(trimmed);
+  if (isUncRoot(trimmed)) return trimmed.replace(/[\\/]+$/, "\\");
+  const normalized = trimmed.replace(/[\\/]+$/, "");
+  return normalized || trimmed;
+}
+
 export function getRemoteParentDirectory(path: string) {
   const normalized = normalizeDirectoryPath(path);
   if (!normalized || normalized === "/") return "/";
   const index = normalized.lastIndexOf("/");
   return index <= 0 ? "/" : normalized.slice(0, index);
+}
+
+export function getExplorerParentDirectory(path: string, backend: FileExplorerBackendKind) {
+  if (backend === "remote") return getRemoteParentDirectory(path);
+
+  const normalized = normalizeExplorerPath(path, backend);
+  if (!normalized || normalized === "/" || normalized === "\\" || isWindowsDriveRoot(normalized)) {
+    return normalized;
+  }
+  if (isUncRoot(normalized)) return normalized;
+
+  const lastSlash = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
+  if (lastSlash < 0) return normalized;
+  if (lastSlash === 0) return normalized.slice(0, 1);
+  if (lastSlash === 2 && /^[a-zA-Z]:/.test(normalized)) return `${normalized.slice(0, 2)}\\`;
+  return normalized.slice(0, lastSlash);
+}
+
+export function joinExplorerPath(basePath: string, name: string, backend: FileExplorerBackendKind) {
+  if (backend === "remote") {
+    return basePath === "/" ? `/${name}` : `${basePath}/${name}`;
+  }
+  const normalizedBase = normalizeExplorerPath(basePath, backend);
+  const separator = getLocalSeparator(normalizedBase);
+  if (!normalizedBase) return name;
+  if (normalizedBase.endsWith("/") || normalizedBase.endsWith("\\")) {
+    return `${normalizedBase}${name}`;
+  }
+  return `${normalizedBase}${separator}${name}`;
+}
+
+export function pathStartsWithDirectory(
+  path: string,
+  directory: string,
+  backend: FileExplorerBackendKind,
+) {
+  const normalizedPath = normalizeExplorerPath(path, backend);
+  const normalizedDirectory = normalizeExplorerPath(directory, backend);
+  if (!normalizedPath || !normalizedDirectory) return false;
+  if (normalizedPath === normalizedDirectory) return true;
+  const separator = getLocalSeparator(normalizedDirectory);
+  const prefix =
+    normalizedDirectory.endsWith("/") || normalizedDirectory.endsWith("\\")
+      ? normalizedDirectory
+      : `${normalizedDirectory}${backend === "remote" ? "/" : separator}`;
+  if (backend === "remote") return normalizedPath.startsWith(prefix);
+
+  const isWindowsStylePath =
+    /^[a-zA-Z]:[\\/]/.test(normalizedPath) ||
+    /^[a-zA-Z]:[\\/]/.test(normalizedDirectory) ||
+    normalizedPath.startsWith("\\\\") ||
+    normalizedDirectory.startsWith("\\\\") ||
+    normalizedPath.includes("\\") ||
+    normalizedDirectory.includes("\\");
+  return isWindowsStylePath
+    ? normalizedPath.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase())
+    : normalizedPath.startsWith(prefix);
+}
+
+export function formatExplorerPathFromHome(
+  path: string,
+  homeDir: string,
+  backend: FileExplorerBackendKind,
+) {
+  const normalizedPath = normalizeExplorerPath(path, backend);
+  const normalizedHome = normalizeExplorerPath(homeDir, backend);
+  if (!normalizedPath || !normalizedHome) return normalizedPath || "~";
+  if (normalizedPath === normalizedHome) return "~";
+  if (!pathStartsWithDirectory(normalizedPath, normalizedHome, backend)) return normalizedPath;
+
+  const suffix = normalizedPath.slice(normalizedHome.length);
+  if (!suffix) return "~";
+  if (suffix.startsWith("/") || suffix.startsWith("\\")) return `~${suffix}`;
+  return `~${backend === "remote" ? "/" : getLocalSeparator(normalizedPath)}${suffix}`;
 }
 
 export function isParentDirectoryEntry(entry: FileEntry) {
@@ -428,8 +534,12 @@ export function isParentDirectoryEntry(entry: FileEntry) {
  * Deduplicates by path (moving an existing entry to the top), keeps the most
  * recent first, and caps the list to avoid unbounded growth per session.
  */
-export function pushVisitedHistory(list: string[], path: string): string[] {
-  const normalizedPath = normalizeDirectoryPath(path);
+export function pushVisitedHistory(
+  list: string[],
+  path: string,
+  backend: FileExplorerBackendKind = "remote",
+): string[] {
+  const normalizedPath = normalizeExplorerPath(path, backend);
   if (!normalizedPath) return list;
   const withoutDuplicate = list.filter((entry) => entry !== normalizedPath);
   withoutDuplicate.unshift(normalizedPath);
@@ -488,11 +598,12 @@ export function buildSessionCacheSnapshot(
   history: string[],
   historyIndex: number,
   visitedHistory: string[],
+  backend: FileExplorerBackendKind = "remote",
 ): FileExplorerSessionCache | null {
-  const normalizedCurrentPath = normalizeDirectoryPath(currentPath);
-  const normalizedHomeDir = normalizeDirectoryPath(homeDir);
+  const normalizedCurrentPath = normalizeExplorerPath(currentPath, backend);
+  const normalizedHomeDir = normalizeExplorerPath(homeDir, backend);
   const normalizedHistory = history
-    .map((entry) => normalizeDirectoryPath(entry))
+    .map((entry) => normalizeExplorerPath(entry, backend))
     .filter((entry): entry is string => !!entry);
 
   if (!normalizedCurrentPath) {
@@ -503,7 +614,7 @@ export function buildSessionCacheSnapshot(
   const nextHistoryIndex = Math.min(Math.max(historyIndex, 0), nextHistory.length - 1);
 
   const normalizedVisited = visitedHistory
-    .map((entry) => normalizeDirectoryPath(entry))
+    .map((entry) => normalizeExplorerPath(entry, backend))
     .filter((entry): entry is string => !!entry)
     .slice(0, MAX_VISITED_HISTORY);
 
